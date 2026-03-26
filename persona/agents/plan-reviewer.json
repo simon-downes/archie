@@ -1,0 +1,31 @@
+{
+  "name": "plan-reviewer",
+  "description": "Reviews implementation plans for completeness, unresolved decisions, and implementability",
+  "prompt": "file://../prompts/plan-reviewer.prompt.md",
+  "tools": ["read", "glob", "grep", "shell", "code"],
+  "allowedTools": ["read", "glob", "grep", "shell", "code"],
+  "toolsSettings": {
+    "shell": {
+      "autoAllowReadonly": true,
+      "denyByDefault": true,
+      "allowedCommands": [
+        "ak( .*)?",
+        "tree( .*)?",
+        "wc( .*)?",
+        "head( .*)?",
+        "tail( .*)?",
+        "cat( .*)?",
+        "find( .*)?",
+        "git ls-files( .*)?",
+        "git log( .*)?",
+        "git diff( .*)?",
+        "git show( .*)?"
+      ],
+      "deniedCommands": [
+        ".*\\brm\\b.*",
+        ".*\\bsudo\\b.*",
+        ".*\\bgit\\s+(push|commit|reset|rebase|clean|checkout|merge)\\b.*"
+      ]
+    }
+  }
+}

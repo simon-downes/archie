@@ -1,0 +1,44 @@
+{
+  "name": "qa-runner",
+  "description": "Runs qa checks such as formatting, linting, and tests",
+  "prompt": "file://../prompts/qa-runner.prompt.md",
+  "tools": ["read", "glob", "grep", "shell"],
+  "allowedTools": ["read", "glob", "grep", "shell"],
+  "resources": [
+    "file://AGENTS.md",
+    "file://README.md",
+    "file://CONTRIBUTING.md",
+    "file://Makefile",
+    "file://pyproject.toml",
+    "file://tflint.hcl",
+    "file://.kiro/steering/**/*.md"
+  ],
+  "toolsSettings": {
+    "shell": {
+      "autoAllowReadonly": true,
+      "denyByDefault": true,
+      "allowedCommands": [
+        "ak( .*)?",
+        "npm run [a-zA-Z0-9:_-]+( .*)?",
+        "pnpm run [a-zA-Z0-9:_-]+( .*)?",
+        "yarn [a-zA-Z0-9:_-]+( .*)?",
+        "make [a-zA-Z0-9:_-]+( .*)?",
+        "just [a-zA-Z0-9:_-]+( .*)?",
+        "uv run .+",
+        "(terraform|tofu) (fmt|validate)( .*)?",
+        "tflint( .*)?"
+      ],
+      "deniedCommands": [
+        ".*\\b(npm|pnpm|yarn)\\s+(i|install|ci|add|link|dedupe|rebuild|audit|fund)\\b.*",
+        ".*\\buv\\s+(sync|pip|add|lock|tool\\s+install|venv)\\b.*",
+        ".*\\b(pip|pip3)\\s+install\\b.*",
+        ".*\\b(poetry|pdm)\\s+install\\b.*",
+        ".*\\b(brew|apt|apt-get|yum|dnf|pacman|apk)\\b.*",
+        ".*\\bgit\\s+clone\\b.*",
+        ".*\\b(push|commit|reset|rebase|clean)\\b.*",
+        ".*\\brm\\b.*",
+        ".*\\bsudo\\b.*"
+      ]
+    }
+  }
+}

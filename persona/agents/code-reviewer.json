@@ -1,0 +1,35 @@
+{
+  "name": "code-reviewer",
+  "description": "Reviews code changes for quality, standards compliance, and correctness",
+  "prompt": "file://../prompts/code-reviewer.prompt.md",
+  "tools": ["read", "glob", "grep", "shell", "code"],
+  "allowedTools": ["read", "glob", "grep", "shell", "code"],
+  "resources": [
+    "file://CONTRIBUTING.md",
+    "file://README.md"
+  ],
+  "toolsSettings": {
+    "shell": {
+      "autoAllowReadonly": true,
+      "denyByDefault": true,
+      "allowedCommands": [
+        "ak( .*)?",
+        "tree( .*)?",
+        "wc( .*)?",
+        "head( .*)?",
+        "tail( .*)?",
+        "cat( .*)?",
+        "find( .*)?",
+        "git ls-files( .*)?",
+        "git log( .*)?",
+        "git diff( .*)?",
+        "git show( .*)?"
+      ],
+      "deniedCommands": [
+        ".*\\brm\\b.*",
+        ".*\\bsudo\\b.*",
+        ".*\\bgit\\s+(push|commit|reset|rebase|clean|checkout|merge)\\b.*"
+      ]
+    }
+  }
+}
