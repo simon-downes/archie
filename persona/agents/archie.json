@@ -1,0 +1,71 @@
+{
+  "name": "archie",
+  "description": "General-purpose engineering agent designed for sandbox execution with broad capabilities and minimal restrictions",
+  "prompt": "file://../prompts/archie.prompt.md",
+  "model": "claude-opus-4.6",
+  "mcpServers": {
+    "aws-knowledge": {
+      "command": "uvx",
+      "args": ["fastmcp", "run", "https://knowledge-mcp.global.api.aws"]
+    },
+    "fetch": {
+      "command": "uvx",
+      "args": ["mcp-server-fetch"]
+    }
+  },
+  "tools": [
+    "read",
+    "write",
+    "glob",
+    "grep",
+    "shell",
+    "aws",
+    "web_search",
+    "web_fetch",
+    "use_subagent",
+    "introspect",
+    "code",
+    "@aws-knowledge",
+    "@fetch"
+  ],
+  "allowedTools": [
+    "read",
+    "write",
+    "glob",
+    "grep",
+    "shell",
+    "aws",
+    "web_search",
+    "web_fetch",
+    "use_subagent",
+    "introspect",
+    "code",
+    "@aws-knowledge",
+    "@fetch"
+  ],
+  "toolAliases": {
+    "@fetch/fetch": "fetch",
+    "@aws-knowledge": "awsdocs"
+  },
+  "toolsSettings": {
+    "use_subagent": {
+      "trustedAgents": [
+        "general-purpose",
+        "code-reviewer",
+        "plan-reviewer",
+        "qa-runner",
+        "codebase-analyzer"
+      ]
+    }
+  },
+  "resources": [
+    "file://README.md",
+    "file://CONTRIBUTING.md",
+    "file://AGENTS.md",
+    "skill://~/.kiro/steering/TOOLS.md",
+    "skill://~/.kiro/skills/**/SKILL.md"
+  ],
+  "includeMcpJson": false,
+  "keyboardShortcut": "ctrl+shift+p",
+  "welcomeMessage": "Archie ready. Running in sandbox with full tool access."
+}
