@@ -196,7 +196,7 @@ RUN uv tool install batrachian-toad
 # Install agent-kit tools as user (frequent updates)
 RUN uv tool install git+https://github.com/simon-downes/agent-kit.git
 
-# Ensure user's tool bin is in PATH
-ENV PATH="/home/$USERNAME/.local/bin:$PATH"
+# Ensure user's tool bin is in PATH (ARG not available in ENV, so use RUN)
+RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 
 CMD ["/bin/bash"]

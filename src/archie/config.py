@@ -89,8 +89,14 @@ def install() -> None:
 
 def load_config() -> dict:
     """Load config from ~/.archie/config.yaml."""
-    with CONFIG_PATH.open() as f:
-        return yaml.safe_load(f) or {}
+    try:
+        with CONFIG_PATH.open() as f:
+            return yaml.safe_load(f) or {}
+    except yaml.YAMLError:
+        from archie.output import print_error
+
+        print_error(f"Invalid YAML in {CONFIG_PATH}")
+        raise SystemExit(1) from None
 
 
 def check_status() -> StatusCheck:
@@ -99,8 +105,11 @@ def check_status() -> StatusCheck:
     config = load_config()
 
     # Docker installed?
-    result = subprocess.run(["docker", "--version"], capture_output=True, check=False)
-    status.docker_installed = result.returncode == 0
+    try:
+        result = subprocess.run(["docker", "--version"], capture_output=True, check=False)
+        status.docker_installed = result.returncode == 0
+    except FileNotFoundError:
+        status.docker_installed = False
 
     # Docker running?
     if status.docker_installed:
@@ -151,11 +160,13 @@ def resolve_env(config: dict) -> dict[str, str]:
 
 
 def resolve_mounts(config: dict) -> list[tuple[str, str]]:
-    """Resolve mount entries to (host_path, container_path) pairs.
+    """Resolve mount entries to (host_path, container_mount) pairs.
+
+    container_mount may include Docker options like :ro.
 
     Entries can be:
     - str: auto-mapped from host home to container home
-    - list [src, dest]: explicit mapping
+    - list [src, dest]: explicit mapping (dest may include :ro etc.)
     """
     from archie.docker import HOST_USERNAME
 
@@ -166,13 +177,19 @@ def resolve_mounts(config: dict) -> list[tuple[str, str]]:
     for entry in config.get("mounts", []):
         if isinstance(entry, str):
             host_path = str(Path(entry).expanduser())
-            container_path = host_path.replace(host_home, container_home)
+            container_mount = host_path.replace(host_home, container_home)
         else:
             host_path = str(Path(entry[0]).expanduser())
-            container_path = entry[1].replace("~", container_home)
+            # Split off any Docker options (e.g. :ro) before path substitution
+            dest = entry[1]
+            if ":" in dest.lstrip("~"):
+                path_part, _, options = dest.rpartition(":")
+                container_mount = f"{path_part.replace('~', container_home)}:{options}"
+            else:
+                container_mount = dest.replace("~", container_home)
 
         if Path(host_path).exists():
-            mounts.append((host_path, container_path))
+            mounts.append((host_path, container_mount))
 
     return mounts
 

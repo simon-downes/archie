@@ -2,6 +2,7 @@
 
 import os
 import pwd
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -13,6 +14,11 @@ CONTAINER_PREFIX = "archie-"
 _user_info = pwd.getpwuid(os.getuid())
 HOST_USERNAME = _user_info.pw_name
 HOST_UID = _user_info.pw_uid
+
+
+def _sanitize_name(name: str) -> str:
+    """Sanitize a string for use in Docker container names."""
+    return re.sub(r"[^a-zA-Z0-9_.-]", "-", name)
 
 
 def _docker(*args: str, capture: bool = False) -> subprocess.CompletedProcess:
@@ -82,7 +88,7 @@ def run_container(command: list[str], tool_name: str = "shell") -> int:
     host_home = str(Path.home())
     container_home = f"/home/{HOST_USERNAME}"
     container_project = str(project).replace(host_home, container_home)
-    container_name = f"{CONTAINER_PREFIX}{tool_name}-{project.name}"
+    container_name = f"{CONTAINER_PREFIX}{_sanitize_name(tool_name)}-{_sanitize_name(project.name)}"
 
     # Check for existing session
     if _docker_output("ps", "-q", "--filter", f"name=^/{container_name}$"):
@@ -112,8 +118,8 @@ def run_container(command: list[str], tool_name: str = "shell") -> int:
     for name, value in env.items():
         args.extend(["-e", f"{name}={value}"])
 
-    for host_path, container_path in mounts:
-        args.extend(["-v", f"{host_path}:{container_path}"])
+    for host_path, container_mount in mounts:
+        args.extend(["-v", f"{host_path}:{container_mount}"])
 
     args.extend([IMAGE_NAME, *command])
 
