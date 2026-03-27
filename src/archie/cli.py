@@ -17,7 +17,6 @@ from archie.output import (
     bullet_list,
     data_table,
     display_header,
-    empty_state,
     print_error,
     print_info,
     print_success,
@@ -26,7 +25,7 @@ from archie.output import (
 )
 
 # Built-in commands that can't be used as tool names
-BUILTIN_COMMANDS = {"install", "status", "build", "shell", "list", "auth"}
+BUILTIN_COMMANDS = {"install", "status", "build", "shell", "auth"}
 
 
 class ArchieCLI(click.Group):
@@ -137,6 +136,15 @@ def status() -> None:
         section("Credential Issues")
         bullet_list([f"[{C_VAL}]{issue}[/]" for issue in s.credential_issues])
 
+    # Sessions
+    containers = list_containers()
+    if containers:
+        section("Sessions")
+        data_table(
+            *[(c["name"], c["status"], c["image"]) for c in containers],
+            styles=[C_KEY, C_OK, C_MUTED],
+        )
+
 
 @main.command()
 def build() -> None:
@@ -165,17 +173,3 @@ def shell() -> None:
         sys.exit(1)
 
     sys.exit(run_container(["/bin/bash"]))
-
-
-@main.command(name="list")
-def list_cmd() -> None:
-    """List running archie sessions."""
-    containers = list_containers()
-    if not containers:
-        empty_state("No active sessions")
-        return
-
-    data_table(
-        *[(c["name"], c["status"], c["image"]) for c in containers],
-        styles=[C_KEY, C_OK, C_MUTED],
-    )
