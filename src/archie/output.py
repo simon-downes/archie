@@ -151,7 +151,11 @@ def _format_delta(delta: timedelta) -> str:
     return f"{seconds // 86400}d"
 
 
-def display_header(tool_name: str, project: str, container_name: str) -> None:
+def display_header(
+    tool_name: str | None = None,
+    project: str | None = None,
+    container_name: str | None = None,
+) -> None:
     """Display startup banner with themed gradient."""
     from rich.panel import Panel
 
@@ -174,14 +178,17 @@ def display_header(tool_name: str, project: str, container_name: str) -> None:
     banner_lines[-2] = f"{banner_lines[-2]:<{max_width}}  [{colors[0]}]v{__version__}[/]"
 
     banner = "\n".join(f"[{c}]{line}[/]" for c, line in zip(colors, banner_lines, strict=True))
-    info = (
-        f"[{C_KEY}]{project}[/]"
-        f" [{C_CHROME}]•[/] [{C_HEADING}]{tool_name}[/]"
-        f" [{C_CHROME}]•[/] [{C_MUTED}]{container_name}[/]"
-    )
+
+    content = banner
+    if tool_name and project and container_name:
+        info = (
+            f"[{C_KEY}]{project}[/]"
+            f" [{C_CHROME}]•[/] [{C_HEADING}]{tool_name}[/]"
+            f" [{C_CHROME}]•[/] [{C_MUTED}]{container_name}[/]"
+        )
+        content = f"{banner}\n\n{info}"
 
     frame_color = colors[len(colors) // 2]
-    content = f"{banner}\n\n{info}"
 
     console.print()
     console.print(Panel(content, border_style=frame_color, padding=(1, 2), width=WIDTH))

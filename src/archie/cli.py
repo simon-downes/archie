@@ -16,6 +16,7 @@ from archie.output import (
     C_VAL,
     bullet_list,
     data_table,
+    display_header,
     empty_state,
     print_error,
     print_info,
@@ -117,6 +118,8 @@ def install_cmd() -> None:
 def status() -> None:
     """Check environment readiness."""
     s = check_status()
+
+    display_header()
 
     section("Environment")
     status_table(
