@@ -10,6 +10,7 @@ from archie.config import check_status, install, is_installed, load_config
 from archie.docker import IMAGE_NAME, build_image, list_containers, run_container
 from archie.output import (
     C_CMD,
+    C_ERR,
     C_KEY,
     C_MUTED,
     C_OK,
@@ -17,6 +18,7 @@ from archie.output import (
     bullet_list,
     data_table,
     display_header,
+    human_time,
     print_error,
     print_info,
     print_success,
@@ -132,9 +134,39 @@ def status() -> None:
         section("Missing Mounts")
         bullet_list([f"[{C_VAL}]{m}[/]" for m in s.missing_mounts])
 
-    if s.credential_issues:
-        section("Credential Issues")
-        bullet_list([f"[{C_VAL}]{issue}[/]" for issue in s.credential_issues])
+    # Credentials
+    config = load_config()
+    auth_services = config.get("auth", {})
+    if auth_services:
+        from datetime import datetime
+
+        from archie.auth import get_field
+
+        section("Credentials")
+        rows = []
+        for service, svc_config in auth_services.items():
+            svc_type = svc_config.get("type", "static")
+            fields = svc_config.get("fields", ["access_token"] if svc_type == "oauth" else [])
+            has_creds = any(get_field(service, f) is not None for f in fields)
+            detail = ""
+
+            if svc_type == "oauth":
+                expires_at = get_field(service, "expires_at")
+                if expires_at:
+                    try:
+                        expiry = datetime.fromisoformat(expires_at)
+                        if datetime.now(expiry.tzinfo) > expiry:
+                            detail = f"[{C_ERR}]expired {human_time(expires_at)}[/]"
+                        else:
+                            detail = f"[{C_OK}]expires {human_time(expires_at)}[/]"
+                    except (ValueError, TypeError):
+                        pass
+            elif not has_creds:
+                detail = "not configured"
+
+            rows.append((has_creds, service, svc_type, detail))
+
+        status_table(*rows)
 
     # Sessions
     containers = list_containers()
