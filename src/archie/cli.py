@@ -100,8 +100,14 @@ def _print_not_ready(s) -> None:
 
 
 @click.group(cls=ArchieCLI)
-def main() -> None:
+@click.option("--plain", is_flag=True, help="Disable colours and formatting")
+def main(plain: bool) -> None:
     """Archie — AI-assisted development toolkit."""
+    if plain:
+        from archie.output import console, console_err
+
+        console.no_color = True
+        console_err.no_color = True
 
 
 main.add_command(auth)

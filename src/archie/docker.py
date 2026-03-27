@@ -57,9 +57,7 @@ def list_containers() -> list[dict]:
 
 def image_info() -> dict | None:
     """Get sandbox image info. Returns None if image doesn't exist."""
-    output = _docker_output(
-        "images", IMAGE_NAME, "--format", "{{.CreatedSince}}\t{{.Size}}"
-    )
+    output = _docker_output("images", IMAGE_NAME, "--format", "{{.CreatedSince}}\t{{.Size}}")
     if not output:
         return None
     created, size = output.splitlines()[0].split("\t")

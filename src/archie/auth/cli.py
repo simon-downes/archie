@@ -63,48 +63,6 @@ def import_cmd(service: str, env_vars: tuple[str, ...]) -> None:
     print_success(f"Imported {len(env_vars)} field(s) for [{C_KEY}]{service}[/]")
 
 
-@auth.command(name="status")
-def status_cmd() -> None:
-    """Show credential status for all configured services."""
-    from datetime import datetime
-
-    from archie.auth import get_field
-    from archie.output import C_ERR, C_OK, empty_state, human_time, status_table
-
-    config = load_config()
-    auth_services = config.get("auth", {})
-
-    if not auth_services:
-        empty_state("No auth services configured")
-        return
-
-    rows = []
-    for service, svc_config in auth_services.items():
-        svc_type = svc_config.get("type", "static")
-        fields = svc_config.get("fields", ["access_token"] if svc_type == "oauth" else [])
-
-        has_creds = any(get_field(service, f) is not None for f in fields)
-        detail = ""
-
-        if svc_type == "oauth":
-            expires_at = get_field(service, "expires_at")
-            if expires_at:
-                try:
-                    expiry = datetime.fromisoformat(expires_at)
-                    if datetime.now(expiry.tzinfo) > expiry:
-                        detail = f"[{C_ERR}]expired {human_time(expires_at)}[/]"
-                    else:
-                        detail = f"[{C_OK}]expires {human_time(expires_at)}[/]"
-                except (ValueError, TypeError):
-                    pass
-        elif not has_creds:
-            detail = "not configured"
-
-        rows.append((has_creds, service, svc_type, detail))
-
-    status_table(*rows)
-
-
 @auth.command(name="login")
 @click.argument("service")
 def login_cmd(service: str) -> None:
