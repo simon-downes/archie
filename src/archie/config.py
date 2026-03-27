@@ -29,6 +29,26 @@ DEFAULT_CONFIG = {
             "command": "toad",
         },
     },
+    "auth": {
+        "github": {
+            "type": "static",
+            "fields": ["token"],
+        },
+        "notion": {
+            "type": "oauth",
+        },
+        "aws": {
+            "type": "static",
+            "fields": ["access_key_id", "secret_access_key", "session_token"],
+        },
+    },
+    "credentials": {
+        "GH_TOKEN": "github.token",
+        "NOTION_TOKEN": "notion.access_token",
+        "AWS_ACCESS_KEY_ID": "aws.access_key_id",
+        "AWS_SECRET_ACCESS_KEY": "aws.secret_access_key",
+        "AWS_SESSION_TOKEN": "aws.session_token",
+    },
     "mounts": [
         ["~/.archie/persona/agents", "~/.kiro/agents"],
         ["~/.archie/persona/skills", "~/.kiro/skills"],

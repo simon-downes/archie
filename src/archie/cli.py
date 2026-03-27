@@ -5,12 +5,13 @@ from importlib.resources import as_file, files
 
 import click
 
+from archie.auth.cli import auth  # noqa: E402
 from archie.config import check_status, install, is_installed, load_config
 from archie.docker import IMAGE_NAME, build_image, list_containers, run_container
 from archie.output import print_error, print_info, print_success
 
 # Built-in commands that can't be used as tool names
-BUILTIN_COMMANDS = {"install", "status", "build", "shell", "list"}
+BUILTIN_COMMANDS = {"install", "status", "build", "shell", "list", "auth"}
 
 
 class ArchieCLI(click.Group):
@@ -93,6 +94,9 @@ def _print_not_ready(s) -> None:
 @click.group(cls=ArchieCLI)
 def main() -> None:
     """Archie — AI-assisted development toolkit."""
+
+
+main.add_command(auth)
 
 
 @main.command(name="install")
