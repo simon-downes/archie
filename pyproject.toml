@@ -5,6 +5,7 @@ description = "AI-assisted development toolkit"
 requires-python = ">=3.11"
 dependencies = [
     "click>=8.3.1",
+    "httpx>=0.27.0",
     "pyyaml>=6.0",
     "rich>=13.0.0",
 ]
@@ -25,6 +26,7 @@ packages = ["src/archie"]
 [tool.hatch.build.targets.wheel.force-include]
 "sandbox/Dockerfile" = "archie/sandbox/Dockerfile"
 "persona" = "archie/persona"
+"src/archie/auth/providers.yaml" = "archie/auth/providers.yaml"
 
 [tool.uv]
 package = true

@@ -1,12 +1,15 @@
 """Auth CLI commands."""
 
 import os
+import secrets
 import sys
+from datetime import UTC, datetime
 
 import click
 
 from archie.auth import set_field
-from archie.output import print_error, print_success
+from archie.config import load_config
+from archie.output import print_error, print_info, print_success
 
 
 @click.group()
@@ -65,3 +68,179 @@ def status_cmd() -> None:
     """Show credential status for all configured services."""
     # Placeholder — implemented in milestone 4
     click.echo("Not yet implemented")
+
+
+@auth.command(name="login")
+@click.argument("service")
+def login_cmd(service: str) -> None:
+    """Authenticate with an OAuth service via browser."""
+    from importlib.resources import as_file, files
+
+    import yaml
+
+    from archie.auth.oauth import (
+        CALLBACK_PORT,
+        build_auth_url,
+        discover_endpoints,
+        exchange_code,
+        generate_pkce,
+        open_browser,
+        register_client,
+        wait_for_callback,
+    )
+
+    config = load_config()
+    auth_config = config.get("auth", {}).get(service, {})
+
+    if auth_config.get("type") != "oauth":
+        print_error(f"Service {service} is not an OAuth provider")
+        sys.exit(1)
+
+    redirect_uri = f"http://localhost:{CALLBACK_PORT}/callback"
+
+    # Discover endpoints if not in config
+    if "token_endpoint" not in auth_config:
+        server_url = auth_config.get("server_url")
+        if not server_url:
+            # Try bundled providers
+            try:
+                providers_pkg = files("archie").joinpath("auth", "providers.yaml")
+                with as_file(providers_pkg) as p:
+                    providers = yaml.safe_load(p.read_text())
+                provider = providers.get("providers", {}).get(service)
+                if provider:
+                    server_url = provider.get("server_url")
+            except Exception:
+                pass
+
+        if not server_url:
+            print_error(f"No server_url configured for {service}")
+            sys.exit(1)
+
+        print_info("Discovering OAuth endpoints...")
+        try:
+            metadata = discover_endpoints(server_url)
+            auth_config["authorization_endpoint"] = metadata["authorization_endpoint"]
+            auth_config["token_endpoint"] = metadata["token_endpoint"]
+            if "registration_endpoint" in metadata:
+                auth_config["registration_endpoint"] = metadata["registration_endpoint"]
+        except Exception as e:
+            print_error(f"Failed to discover endpoints: {e}")
+            sys.exit(1)
+
+    # Register client if needed
+    if "client_id" not in auth_config:
+        reg_endpoint = auth_config.get("registration_endpoint")
+        if not reg_endpoint:
+            print_error(f"No client_id or registration_endpoint for {service}")
+            sys.exit(1)
+
+        print_info("Registering OAuth client...")
+        try:
+            client_data = register_client(reg_endpoint, redirect_uri)
+            auth_config["client_id"] = client_data["client_id"]
+        except Exception as e:
+            print_error(f"Client registration failed: {e}")
+            sys.exit(1)
+
+    # Write discovered config back
+    from archie.config import CONFIG_PATH
+
+    full_config = load_config()
+    full_config.setdefault("auth", {})[service] = auth_config
+    CONFIG_PATH.write_text(yaml.dump(full_config, default_flow_style=False, sort_keys=False))
+
+    # Run OAuth flow
+    verifier, challenge = generate_pkce()
+    state = secrets.token_urlsafe(16)
+
+    auth_url = build_auth_url(
+        auth_config["authorization_endpoint"],
+        auth_config["client_id"],
+        redirect_uri,
+        state,
+        challenge,
+    )
+
+    if not open_browser(auth_url):
+        click.echo(f"\nOpen this URL in your browser:\n{auth_url}\n")
+
+    print_info("Waiting for authentication...")
+    code, returned_state, error = wait_for_callback()
+
+    if error:
+        print_error(f"Authentication failed: {error}")
+        sys.exit(1)
+
+    if not code:
+        print_error("Authentication timed out")
+        sys.exit(1)
+
+    if returned_state != state:
+        print_error("State mismatch — possible CSRF attack")
+        sys.exit(1)
+
+    # Exchange code for tokens
+    try:
+        tokens = exchange_code(
+            auth_config["token_endpoint"],
+            auth_config["client_id"],
+            code,
+            verifier,
+            redirect_uri,
+        )
+    except Exception as e:
+        print_error(f"Token exchange failed: {e}")
+        sys.exit(1)
+
+    # Store tokens
+    set_field(service, "access_token", tokens["access_token"])
+    if "refresh_token" in tokens:
+        set_field(service, "refresh_token", tokens["refresh_token"])
+    if "expires_in" in tokens:
+        expires_at = datetime.now(UTC).timestamp() + tokens["expires_in"]
+        set_field(service, "expires_at", datetime.fromtimestamp(expires_at, UTC).isoformat())
+
+    print_success(f"Authenticated with {service}")
+
+
+@auth.command(name="refresh")
+@click.argument("service")
+def refresh_cmd(service: str) -> None:
+    """Refresh OAuth tokens for a service."""
+    from archie.auth import get_field
+    from archie.auth.oauth import refresh_token
+
+    config = load_config()
+    auth_config = config.get("auth", {}).get(service, {})
+
+    if auth_config.get("type") != "oauth":
+        print_error(f"Service {service} is not an OAuth provider")
+        sys.exit(1)
+
+    token_endpoint = auth_config.get("token_endpoint")
+    client_id = auth_config.get("client_id")
+    stored_refresh = get_field(service, "refresh_token")
+
+    if not all([token_endpoint, client_id, stored_refresh]):
+        print_error(
+            f"Missing OAuth config or refresh token for {service}. Run 'archie auth login {service}' first."
+        )
+        sys.exit(1)
+
+    try:
+        tokens = refresh_token(token_endpoint, client_id, stored_refresh)
+    except Exception as e:
+        print_error(f"Token refresh failed: {e}")
+        sys.exit(1)
+
+    set_field(service, "access_token", tokens["access_token"])
+    if "refresh_token" in tokens:
+        set_field(service, "refresh_token", tokens["refresh_token"])
+    if "expires_in" in tokens:
+        from datetime import datetime
+
+        expires_at = datetime.now(UTC).timestamp() + tokens["expires_in"]
+        set_field(service, "expires_at", datetime.fromtimestamp(expires_at, UTC).isoformat())
+
+    print_success(f"Refreshed tokens for {service}")
