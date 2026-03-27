@@ -1,6 +1,10 @@
 ---
 name: policy-lang-python
-description: Standards for writing quality Python code with modern tooling. Use when working with .py files, Python projects, or when Python is mentioned.
+description: >
+  Standards for writing quality Python code with modern tooling. Use when working with
+  .py files, Python projects, or when Python is mentioned. Includes CLI tool standards
+  for building command-line tools with Click, Rich, and uv. Use when creating CLI tools,
+  adding commands, or working with terminal output formatting.
 ---
 
 # Python Coding Standards
@@ -248,3 +252,8 @@ now = datetime.now()
 # Avoid - wildcard imports
 from datetime import *  # Don't do this
 ```
+
+## CLI Tools
+
+When building command-line tools, see [references/CLI-TOOLS.md](references/CLI-TOOLS.md) for
+standards covering project structure, Click patterns, Rich output, and configuration.
