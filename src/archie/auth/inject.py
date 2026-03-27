@@ -1,6 +1,6 @@
 """Resolve credentials from config mappings for container injection."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from archie.auth import get_field
 from archie.output import print_error
@@ -17,20 +17,17 @@ def _try_refresh(service: str, config: dict) -> bool:
         return False
 
     try:
-        from archie.auth import set_field
+        from archie.auth import set_fields
         from archie.auth.oauth import refresh_token
 
         tokens = refresh_token(token_endpoint, client_id, refresh)
-        set_field(service, "access_token", tokens["access_token"])
+        token_data = {"access_token": tokens["access_token"]}
         if "refresh_token" in tokens:
-            set_field(service, "refresh_token", tokens["refresh_token"])
+            token_data["refresh_token"] = tokens["refresh_token"]
         if "expires_in" in tokens:
-            expires_at = datetime.now(datetime.UTC).timestamp() + tokens["expires_in"]
-            set_field(
-                service,
-                "expires_at",
-                datetime.fromtimestamp(expires_at, datetime.UTC).isoformat(),
-            )
+            expires_at = datetime.now(UTC).timestamp() + tokens["expires_in"]
+            token_data["expires_at"] = datetime.fromtimestamp(expires_at, UTC).isoformat()
+        set_fields(service, token_data)
         return True
     except Exception:
         return False

@@ -184,11 +184,11 @@ def login_cmd(service: str) -> None:
             sys.exit(1)
 
     # Write discovered config back
-    from archie.config import CONFIG_PATH
+    from archie.config import _write_config
 
     full_config = load_config()
     full_config.setdefault("auth", {})[service] = auth_config
-    CONFIG_PATH.write_text(yaml.dump(full_config, default_flow_style=False, sort_keys=False))
+    _write_config(full_config)
 
     # Run OAuth flow
     verifier, challenge = generate_pkce()
@@ -234,12 +234,15 @@ def login_cmd(service: str) -> None:
         sys.exit(1)
 
     # Store tokens
-    set_field(service, "access_token", tokens["access_token"])
+    from archie.auth import set_fields
+
+    token_data = {"access_token": tokens["access_token"]}
     if "refresh_token" in tokens:
-        set_field(service, "refresh_token", tokens["refresh_token"])
+        token_data["refresh_token"] = tokens["refresh_token"]
     if "expires_in" in tokens:
         expires_at = datetime.now(UTC).timestamp() + tokens["expires_in"]
-        set_field(service, "expires_at", datetime.fromtimestamp(expires_at, UTC).isoformat())
+        token_data["expires_at"] = datetime.fromtimestamp(expires_at, UTC).isoformat()
+    set_fields(service, token_data)
 
     print_success(f"Authenticated with {service}")
 
@@ -274,13 +277,14 @@ def refresh_cmd(service: str) -> None:
         print_error(f"Token refresh failed: {e}")
         sys.exit(1)
 
-    set_field(service, "access_token", tokens["access_token"])
-    if "refresh_token" in tokens:
-        set_field(service, "refresh_token", tokens["refresh_token"])
-    if "expires_in" in tokens:
-        from datetime import datetime
+    from archie.auth import set_fields
 
+    token_data = {"access_token": tokens["access_token"]}
+    if "refresh_token" in tokens:
+        token_data["refresh_token"] = tokens["refresh_token"]
+    if "expires_in" in tokens:
         expires_at = datetime.now(UTC).timestamp() + tokens["expires_in"]
-        set_field(service, "expires_at", datetime.fromtimestamp(expires_at, UTC).isoformat())
+        token_data["expires_at"] = datetime.fromtimestamp(expires_at, UTC).isoformat()
+    set_fields(service, token_data)
 
     print_success(f"Refreshed tokens for {service}")

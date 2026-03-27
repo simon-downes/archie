@@ -40,6 +40,7 @@ def save_credentials(data: dict) -> None:
         os.close(fd)
 
     CREDENTIALS_PATH.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
+    os.chmod(str(CREDENTIALS_PATH), 0o600)
 
 
 def get_field(service: str, field: str) -> str | None:
@@ -58,4 +59,13 @@ def set_field(service: str, field: str, value: str) -> None:
     if service not in creds:
         creds[service] = {}
     creds[service][field] = value
+    save_credentials(creds)
+
+
+def set_fields(service: str, fields: dict[str, str]) -> None:
+    """Set multiple credential fields in one write."""
+    creds = load_credentials()
+    if service not in creds:
+        creds[service] = {}
+    creds[service].update(fields)
     save_credentials(creds)

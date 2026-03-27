@@ -12,6 +12,7 @@ import httpx
 
 CALLBACK_PORT = 8585
 CALLBACK_TIMEOUT = 120
+HTTP_TIMEOUT = 30
 
 
 def generate_pkce() -> tuple[str, str]:
@@ -23,12 +24,14 @@ def generate_pkce() -> tuple[str, str]:
 
 def discover_endpoints(server_url: str) -> dict[str, Any]:
     """Discover OAuth endpoints using RFC 9470 and RFC 8414."""
-    resp = httpx.get(f"{server_url}/.well-known/oauth-protected-resource")
+    resp = httpx.get(f"{server_url}/.well-known/oauth-protected-resource", timeout=HTTP_TIMEOUT)
     resp.raise_for_status()
 
     auth_server_url = resp.json()["authorization_servers"][0]
 
-    resp = httpx.get(f"{auth_server_url}/.well-known/oauth-authorization-server")
+    resp = httpx.get(
+        f"{auth_server_url}/.well-known/oauth-authorization-server", timeout=HTTP_TIMEOUT
+    )
     resp.raise_for_status()
 
     return resp.json()
@@ -46,6 +49,7 @@ def register_client(registration_endpoint: str, redirect_uri: str) -> dict[str, 
             "token_endpoint_auth_method": "none",
         },
         headers={"Content-Type": "application/json"},
+        timeout=HTTP_TIMEOUT,
     )
     resp.raise_for_status()
     return resp.json()
@@ -65,6 +69,7 @@ def exchange_code(
             "code_verifier": verifier,
         },
         headers={"Content-Type": "application/x-www-form-urlencoded"},
+        timeout=HTTP_TIMEOUT,
     )
     resp.raise_for_status()
     return resp.json()
@@ -80,6 +85,7 @@ def refresh_token(token_endpoint: str, client_id: str, refresh: str) -> dict[str
             "client_id": client_id,
         },
         headers={"Content-Type": "application/x-www-form-urlencoded"},
+        timeout=HTTP_TIMEOUT,
     )
     resp.raise_for_status()
     return resp.json()
