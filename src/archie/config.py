@@ -72,6 +72,7 @@ class StatusCheck:
     project_dir: str = ""
     project: str | None = None
     missing_mounts: list[str] = field(default_factory=list)
+    credential_issues: list[str] = field(default_factory=list)
 
     @property
     def ready(self) -> bool:
@@ -158,6 +159,23 @@ def check_status() -> StatusCheck:
         host_path = Path(src).expanduser()
         if not host_path.exists():
             status.missing_mounts.append(src)
+
+    # Credential issues?
+    from datetime import datetime
+
+    from archie.auth import get_field
+
+    for service, svc_config in config.get("auth", {}).items():
+        svc_type = svc_config.get("type", "static")
+        if svc_type == "oauth":
+            expires_at = get_field(service, "expires_at")
+            if expires_at:
+                try:
+                    expiry = datetime.fromisoformat(expires_at)
+                    if datetime.now(expiry.tzinfo) > expiry:
+                        status.credential_issues.append(f"{service}: expired")
+                except (ValueError, TypeError):
+                    pass
 
     return status
 

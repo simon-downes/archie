@@ -66,8 +66,48 @@ def import_cmd(service: str, env_vars: tuple[str, ...]) -> None:
 @auth.command(name="status")
 def status_cmd() -> None:
     """Show credential status for all configured services."""
-    # Placeholder — implemented in milestone 4
-    click.echo("Not yet implemented")
+    from datetime import datetime
+
+    from rich.console import Console
+
+    from archie.auth import get_field
+
+    console = Console()
+    config = load_config()
+    auth_services = config.get("auth", {})
+
+    if not auth_services:
+        click.echo("No auth services configured")
+        return
+
+    for service, svc_config in auth_services.items():
+        svc_type = svc_config.get("type", "static")
+        fields = svc_config.get("fields", ["access_token"] if svc_type == "oauth" else [])
+
+        # Check if any credentials exist
+        has_creds = any(get_field(service, f) is not None for f in fields)
+
+        if has_creds:
+            icon = "[green]✓[/]"
+        else:
+            icon = "[red]✗[/]"
+
+        line = f"  {icon} [bold]{service}[/]  [dim]{svc_type}[/]"
+
+        # Show expiry for OAuth
+        if svc_type == "oauth":
+            expires_at = get_field(service, "expires_at")
+            if expires_at:
+                try:
+                    expiry = datetime.fromisoformat(expires_at)
+                    if datetime.now(expiry.tzinfo) > expiry:
+                        line += "  [red]expired[/]"
+                    else:
+                        line += f"  [dim]expires {expires_at}[/]"
+                except (ValueError, TypeError):
+                    pass
+
+        console.print(line)
 
 
 @auth.command(name="login")

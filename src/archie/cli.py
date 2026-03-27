@@ -132,6 +132,11 @@ def status() -> None:
         for m in s.missing_mounts:
             console.print(f"    [dim]{m}[/]")
 
+    if s.credential_issues:
+        console.print("\n  [yellow]![/] Credential issues:")
+        for issue in s.credential_issues:
+            console.print(f"    [dim]{issue}[/]")
+
 
 @main.command()
 def build() -> None:
