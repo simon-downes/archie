@@ -67,5 +67,5 @@
   ],
   "includeMcpJson": false,
   "keyboardShortcut": "ctrl+shift+p",
-  "welcomeMessage": "Archie ready. Running in sandbox with full tool access."
+  "welcomeMessage": "Hey {{USER}}, Archie here. Ready when you are."
 }

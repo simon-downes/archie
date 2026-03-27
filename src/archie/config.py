@@ -82,6 +82,9 @@ def install() -> None:
             raise FileNotFoundError("Persona not found in package data or source tree") from None
         shutil.copytree(str(src), str(PERSONA_PATH))
 
+    # Template persona files with user info
+    _template_persona()
+
     # Create config if missing
     if not CONFIG_PATH.exists():
         _write_config(DEFAULT_CONFIG)
@@ -217,6 +220,19 @@ def resolve_project() -> Path:
 
     # First component of the relative path is the project
     return project_dir / relative.parts[0]
+
+
+def _template_persona() -> None:
+    """Replace placeholders in persona files with user info."""
+    import getpass
+
+    username = getpass.getuser().split(".")[0].capitalize()
+    agent_config = PERSONA_PATH / "agents" / "archie.json"
+
+    if agent_config.exists():
+        content = agent_config.read_text()
+        content = content.replace("{{USER}}", username)
+        agent_config.write_text(content)
 
 
 def _write_config(config: dict) -> None:
