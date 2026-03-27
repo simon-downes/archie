@@ -23,7 +23,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development conventions.
 ## Quick Start
 
 ```bash
-# Install the CLI (editable for development)
+# Install from GitHub
+uv tool install git+https://github.com/simon-downes/archie.git
+
+# Or install locally (editable, for development)
 uv tool install -e .
 
 # Set up ~/.archie/ (persona + default config)
