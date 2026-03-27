@@ -10,6 +10,16 @@ Archie consolidates three concerns into one tool:
 - **Sandbox** — Docker containers with a full development toolchain where agents run
 - **Credentials** — secure storage and injection of API tokens and OAuth credentials into containers
 
+## Key Rules
+
+- Credentials go in `credentials.yaml`, never in `config.yaml`
+- Edit persona in the repo, run `archie install` to deploy — `~/.archie/persona/` is the deploy target
+- Config changes are immediate; persona changes require `archie install`
+- Tool commands (`kiro`, `toad`) come from config — add new ones without code changes
+- The sandbox runs as your host user, not root
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development conventions.
+
 ## Quick Start
 
 ```bash
@@ -289,3 +299,5 @@ uv run ruff format src/
 # After changing persona files, re-deploy
 archie install
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for project conventions, adding commands, and auth providers.
