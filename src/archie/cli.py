@@ -7,7 +7,7 @@ import click
 
 from archie.auth.cli import auth  # noqa: E402
 from archie.config import check_status, install, is_installed, load_config
-from archie.docker import IMAGE_NAME, build_image, list_containers, run_container
+from archie.docker import IMAGE_NAME, build_image, image_info, list_containers, run_container
 from archie.output import (
     C_CMD,
     C_ERR,
@@ -15,9 +15,9 @@ from archie.output import (
     C_MUTED,
     C_OK,
     C_VAL,
-    bullet_list,
     data_table,
     display_header,
+    empty_state,
     human_time,
     print_error,
     print_info,
@@ -118,10 +118,17 @@ def install_cmd() -> None:
 @main.command()
 def status() -> None:
     """Check environment readiness."""
+    from datetime import datetime
+
+    from archie.auth import get_field
+    from archie.config import CONFIG_PATH
+
     s = check_status()
+    config = load_config()
 
     display_header()
 
+    # 1. Environment
     section("Environment")
     status_table(
         (s.docker_installed, "Docker", "installed" if s.docker_installed else "not installed"),
@@ -130,18 +137,17 @@ def status() -> None:
         (s.project is not None, "Current project", s.project or "not in a project"),
     )
 
-    if s.missing_mounts:
-        section("Missing Mounts")
-        bullet_list([f"[{C_VAL}]{m}[/]" for m in s.missing_mounts])
+    # 2. Sandbox Image
+    section("Sandbox Image")
+    img = image_info()
+    if img:
+        status_table((True, IMAGE_NAME, f"built {img['created']}   {img['size']}"))
+    else:
+        status_table((False, IMAGE_NAME, "not built"))
 
-    # Credentials
-    config = load_config()
+    # 3. Credentials
     auth_services = config.get("auth", {})
     if auth_services:
-        from datetime import datetime
-
-        from archie.auth import get_field
-
         section("Credentials")
         rows = []
         for service, svc_config in auth_services.items():
@@ -165,10 +171,20 @@ def status() -> None:
                 detail = "not configured"
 
             rows.append((has_creds, service, svc_type, detail))
-
         status_table(*rows)
 
-    # Sessions
+    # 4. Mounts
+    section("Mounts")
+    mount_rows = []
+    for entry in config.get("mounts", []):
+        src = entry if isinstance(entry, str) else entry[0]
+        from pathlib import Path
+
+        exists = Path(src).expanduser().exists()
+        mount_rows.append((exists, src, "missing" if not exists else ""))
+    status_table(*mount_rows)
+
+    # 5. Sessions
     containers = list_containers()
     if containers:
         section("Sessions")
@@ -176,6 +192,10 @@ def status() -> None:
             *[(c["name"], c["status"], c["image"]) for c in containers],
             styles=[C_KEY, C_OK, C_MUTED],
         )
+
+    # 6. Config
+    section("Config")
+    empty_state(str(CONFIG_PATH))
 
 
 @main.command()

@@ -55,6 +55,15 @@ def list_containers() -> list[dict]:
     return containers
 
 
+def image_info() -> dict | None:
+    """Get sandbox image info. Returns None if image doesn't exist."""
+    output = _docker_output("images", IMAGE_NAME, "--format", "{{.CreatedAt}}\t{{.Size}}")
+    if not output:
+        return None
+    created, size = output.splitlines()[0].split("\t")
+    return {"created": created, "size": size}
+
+
 def build_image(context_path: Path) -> None:
     """Build the sandbox Docker image."""
     result = _docker(
