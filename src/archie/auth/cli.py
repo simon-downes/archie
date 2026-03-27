@@ -9,7 +9,7 @@ import click
 
 from archie.auth import set_field
 from archie.config import load_config
-from archie.output import print_error, print_info, print_success
+from archie.output import C_KEY, print_error, print_info, print_success
 
 
 @click.group()
@@ -31,12 +31,12 @@ def set_cmd(service: str, fields: tuple[str, ...]) -> None:
         else:
             value = sys.stdin.readline().strip()
             if not value:
-                print_error(f"No value provided for {service}.{field}")
+                print_error(f"No value provided for [{C_KEY}]{service}.{field}[/]")
                 sys.exit(1)
 
         set_field(service, field, value)
 
-    print_success(f"Stored {len(fields)} field(s) for {service}")
+    print_success(f"Stored {len(fields)} field(s) for [{C_KEY}]{service}[/]")
 
 
 @auth.command(name="import")
@@ -60,7 +60,7 @@ def import_cmd(service: str, env_vars: tuple[str, ...]) -> None:
             field = field[len(prefix) :]
         set_field(service, field, os.environ[var])
 
-    print_success(f"Imported {len(env_vars)} field(s) for {service}")
+    print_success(f"Imported {len(env_vars)} field(s) for [{C_KEY}]{service}[/]")
 
 
 @auth.command(name="status")
@@ -68,46 +68,41 @@ def status_cmd() -> None:
     """Show credential status for all configured services."""
     from datetime import datetime
 
-    from rich.console import Console
-
     from archie.auth import get_field
+    from archie.output import C_ERR, C_OK, empty_state, human_time, status_table
 
-    console = Console()
     config = load_config()
     auth_services = config.get("auth", {})
 
     if not auth_services:
-        click.echo("No auth services configured")
+        empty_state("No auth services configured")
         return
 
+    rows = []
     for service, svc_config in auth_services.items():
         svc_type = svc_config.get("type", "static")
         fields = svc_config.get("fields", ["access_token"] if svc_type == "oauth" else [])
 
-        # Check if any credentials exist
         has_creds = any(get_field(service, f) is not None for f in fields)
+        detail = ""
 
-        if has_creds:
-            icon = "[green]✓[/]"
-        else:
-            icon = "[red]✗[/]"
-
-        line = f"  {icon} [bold]{service}[/]  [dim]{svc_type}[/]"
-
-        # Show expiry for OAuth
         if svc_type == "oauth":
             expires_at = get_field(service, "expires_at")
             if expires_at:
                 try:
                     expiry = datetime.fromisoformat(expires_at)
                     if datetime.now(expiry.tzinfo) > expiry:
-                        line += "  [red]expired[/]"
+                        detail = f"[{C_ERR}]expired {human_time(expires_at)}[/]"
                     else:
-                        line += f"  [dim]expires {expires_at}[/]"
+                        detail = f"[{C_OK}]expires {human_time(expires_at)}[/]"
                 except (ValueError, TypeError):
                     pass
+        elif not has_creds:
+            detail = "not configured"
 
-        console.print(line)
+        rows.append((has_creds, service, svc_type, detail))
+
+    status_table(*rows)
 
 
 @auth.command(name="login")
@@ -133,7 +128,7 @@ def login_cmd(service: str) -> None:
     auth_config = config.get("auth", {}).get(service, {})
 
     if auth_config.get("type") != "oauth":
-        print_error(f"Service {service} is not an OAuth provider")
+        print_error(f"Service [{C_KEY}]{service}[/] is not an OAuth provider")
         sys.exit(1)
 
     redirect_uri = f"http://localhost:{CALLBACK_PORT}/callback"
@@ -154,7 +149,7 @@ def login_cmd(service: str) -> None:
                 pass
 
         if not server_url:
-            print_error(f"No server_url configured for {service}")
+            print_error(f"No server_url configured for [{C_KEY}]{service}[/]")
             sys.exit(1)
 
         print_info("Discovering OAuth endpoints...")
@@ -172,7 +167,7 @@ def login_cmd(service: str) -> None:
     if "client_id" not in auth_config:
         reg_endpoint = auth_config.get("registration_endpoint")
         if not reg_endpoint:
-            print_error(f"No client_id or registration_endpoint for {service}")
+            print_error(f"No client_id or registration_endpoint for [{C_KEY}]{service}[/]")
             sys.exit(1)
 
         print_info("Registering OAuth client...")
@@ -244,7 +239,7 @@ def login_cmd(service: str) -> None:
         token_data["expires_at"] = datetime.fromtimestamp(expires_at, UTC).isoformat()
     set_fields(service, token_data)
 
-    print_success(f"Authenticated with {service}")
+    print_success(f"Authenticated with [{C_KEY}]{service}[/]")
 
 
 @auth.command(name="refresh")
@@ -258,7 +253,7 @@ def refresh_cmd(service: str) -> None:
     auth_config = config.get("auth", {}).get(service, {})
 
     if auth_config.get("type") != "oauth":
-        print_error(f"Service {service} is not an OAuth provider")
+        print_error(f"Service [{C_KEY}]{service}[/] is not an OAuth provider")
         sys.exit(1)
 
     token_endpoint = auth_config.get("token_endpoint")
@@ -287,4 +282,4 @@ def refresh_cmd(service: str) -> None:
         token_data["expires_at"] = datetime.fromtimestamp(expires_at, UTC).isoformat()
     set_fields(service, token_data)
 
-    print_success(f"Refreshed tokens for {service}")
+    print_success(f"Refreshed tokens for [{C_KEY}]{service}[/]")
