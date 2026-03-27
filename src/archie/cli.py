@@ -122,9 +122,12 @@ def install_cmd() -> None:
 
 
 @main.command()
-def status() -> None:
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def status(as_json: bool) -> None:
     """Check environment readiness."""
+    import json as json_mod
     from datetime import datetime
+    from pathlib import Path
 
     from archie.auth import get_field
     from archie.config import CONFIG_PATH
@@ -132,9 +135,48 @@ def status() -> None:
     s = check_status()
     config = load_config()
 
+    # Collect all data
+    img = image_info()
+    containers = list_containers()
+
+    auth_services = config.get("auth", {})
+    creds_data = {}
+    for service, svc_config in auth_services.items():
+        svc_type = svc_config.get("type", "static")
+        fields = svc_config.get("fields", ["access_token"] if svc_type == "oauth" else [])
+        has_creds = any(get_field(service, f) is not None for f in fields)
+        expires_at = get_field(service, "expires_at") if svc_type == "oauth" else None
+        creds_data[service] = {
+            "type": svc_type,
+            "configured": has_creds,
+            **({"expires_at": expires_at} if expires_at else {}),
+        }
+
+    mounts_data = []
+    for entry in config.get("mounts", []):
+        src = entry if isinstance(entry, str) else entry[0]
+        mounts_data.append({"path": src, "exists": Path(src).expanduser().exists()})
+
+    if as_json:
+        data = {
+            "environment": {
+                "docker_installed": s.docker_installed,
+                "docker_running": s.docker_running,
+                "project_dir": s.project_dir,
+                "project": s.project,
+            },
+            "image": {"name": IMAGE_NAME, **(img or {"created": None, "size": None})},
+            "credentials": creds_data,
+            "mounts": mounts_data,
+            "sessions": containers,
+            "config_path": str(CONFIG_PATH),
+        }
+        click.echo(json_mod.dumps(data, indent=2))
+        return
+
+    # Rich output
     display_header()
 
-    # 1. Environment
     section("Environment")
     status_table(
         (s.docker_installed, "Docker", "installed" if s.docker_installed else "not installed"),
@@ -143,55 +185,36 @@ def status() -> None:
         (s.project is not None, "Current project", s.project or "not in a project"),
     )
 
-    # 2. Sandbox Image
     section("Sandbox Image")
-    img = image_info()
     if img:
         status_table((True, IMAGE_NAME, f"{img['created']}   {img['size']}"))
     else:
         status_table((False, IMAGE_NAME, "not built"))
 
-    # 3. Credentials
-    auth_services = config.get("auth", {})
     if auth_services:
         section("Credentials")
         rows = []
-        for service, svc_config in auth_services.items():
-            svc_type = svc_config.get("type", "static")
-            fields = svc_config.get("fields", ["access_token"] if svc_type == "oauth" else [])
-            has_creds = any(get_field(service, f) is not None for f in fields)
+        for service, info in creds_data.items():
             detail = ""
-
-            if svc_type == "oauth":
-                expires_at = get_field(service, "expires_at")
-                if expires_at:
-                    try:
-                        expiry = datetime.fromisoformat(expires_at)
-                        if datetime.now(expiry.tzinfo) > expiry:
-                            detail = f"[{C_ERR}]expired {human_time(expires_at)}[/]"
-                        else:
-                            detail = f"[{C_OK}]expires {human_time(expires_at)}[/]"
-                    except (ValueError, TypeError):
-                        pass
-            elif not has_creds:
+            if info["type"] == "oauth" and info.get("expires_at"):
+                try:
+                    expiry = datetime.fromisoformat(info["expires_at"])
+                    if datetime.now(expiry.tzinfo) > expiry:
+                        detail = f"[{C_ERR}]expired {human_time(info['expires_at'])}[/]"
+                    else:
+                        detail = f"[{C_OK}]expires {human_time(info['expires_at'])}[/]"
+                except (ValueError, TypeError):
+                    pass
+            elif not info["configured"]:
                 detail = "not configured"
-
-            rows.append((has_creds, service, svc_type, detail))
+            rows.append((info["configured"], service, info["type"], detail))
         status_table(*rows)
 
-    # 4. Mounts
     section("Mounts")
-    mount_rows = []
-    for entry in config.get("mounts", []):
-        src = entry if isinstance(entry, str) else entry[0]
-        from pathlib import Path
+    status_table(
+        *[(m["exists"], m["path"], "missing" if not m["exists"] else "") for m in mounts_data]
+    )
 
-        exists = Path(src).expanduser().exists()
-        mount_rows.append((exists, src, "missing" if not exists else ""))
-    status_table(*mount_rows)
-
-    # 5. Sessions
-    containers = list_containers()
     if containers:
         section("Sessions")
         data_table(
@@ -199,7 +222,6 @@ def status() -> None:
             styles=[C_KEY, C_OK, C_MUTED],
         )
 
-    # 6. Config
     section("Config")
     empty_state(str(CONFIG_PATH))
 
