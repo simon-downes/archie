@@ -141,7 +141,7 @@ def status() -> None:
     section("Sandbox Image")
     img = image_info()
     if img:
-        status_table((True, IMAGE_NAME, f"built {img['created']}   {img['size']}"))
+        status_table((True, IMAGE_NAME, f"{img['created']}   {img['size']}"))
     else:
         status_table((False, IMAGE_NAME, "not built"))
 
