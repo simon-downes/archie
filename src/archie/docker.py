@@ -78,12 +78,14 @@ def run_container(command: list[str], tool_name: str = "shell") -> int:
         command: Command and arguments to run in the container.
         tool_name: Used for container naming (archie-<tool>-<project>).
     """
+    from archie.auth.inject import resolve_credentials
     from archie.config import load_config, resolve_env, resolve_mounts, resolve_project
 
     config = load_config()
     project = resolve_project()
     mounts = resolve_mounts(config)
     env = resolve_env(config)
+    creds = resolve_credentials(config)
 
     host_home = str(Path.home())
     container_home = f"/home/{HOST_USERNAME}"
@@ -115,7 +117,7 @@ def run_container(command: list[str], tool_name: str = "shell") -> int:
     if sys.stdin.isatty():
         args.append("-it")
 
-    for name, value in env.items():
+    for name, value in {**env, **creds}.items():
         args.extend(["-e", f"{name}={value}"])
 
     for host_path, container_mount in mounts:
