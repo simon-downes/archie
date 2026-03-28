@@ -89,4 +89,53 @@ redis-cli -h <hostname> -p 6379 --tls
 `nc` (netcat) for TCP port checks, `ping` for ICMP reachability, `dig`/`nslookup` for DNS.
 Most AWS services don't respond to ICMP — prefer `nc -zv <host> <port>` for connectivity testing.
 
+## Agent Kit (ak)
+
+CLI toolkit for structured access to SaaS APIs. Outputs JSON to stdout, errors to stderr.
+Credentials come from environment variables (e.g. `NOTION_TOKEN`).
+
+### ak notion — Notion Integration
+
+Communicates via the Notion MCP proxy. Requires `NOTION_TOKEN` env var.
+
+**Reading pages and content:**
+```bash
+# Search the workspace (unrestricted by scope)
+ak notion search "project notes" --limit 5
+
+# Fetch a page
+ak notion page <page-id>
+ak notion page <page-id> --markdown
+ak notion page "https://www.notion.so/Page-Title-<id>"
+```
+
+**Querying databases:**
+```bash
+# List available views
+ak notion db <database-id> --views
+
+# Query rows from a view (defaults to first view)
+ak notion query <database-id> --columns Title,Status,Owner --limit 10
+ak notion query <database-id> --view "Overview" --filter "Status=Done"
+ak notion query <database-id> --filter "Owner!=Platform" --sort "Delivery:desc"
+ak notion query <database-id> --filter "Initiative~=GitHub"
+```
+
+Filter operators: `=` (equals), `!=` (not equals), `~=` (contains).
+Filtering, sorting, and column selection are post-processing on view results.
+
+**Comments:**
+```bash
+ak notion comments <page-id>
+```
+
+**When to use:** Reading Notion pages for context, querying databases for project status,
+searching the workspace for documentation. Prefer `ak notion query` with `--columns` and
+`--limit` to keep output concise.
+
+**Access scoping:** Config may restrict access to specific page subtrees. Search is always
+unrestricted but page/database content operations check the page's ancestor chain against
+the allowlist. If a fetch is rejected with a scope error, the page is outside the configured
+access boundary.
+
 
