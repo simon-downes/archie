@@ -49,16 +49,14 @@ For each milestone, work through these steps:
 
 ### Setup (first milestone only)
 
-If the plan came from an issue tracker (identifier format indicates the tracker:
-`PLAT-123` → Linear via `ak linear`, `#42` → GitHub via `gh`):
+If the plan came from an issue tracker:
 - Update the issue status to "In Progress" (or nearest equivalent)
-  - Linear: `ak linear update-issue PLAT-123 --status "In Progress"`
-  - GitHub: handled automatically by branch/PR conventions
 - Create a branch from the default branch: `<user>/<ISSUE-KEY>-<description>`
 
 If the plan is a local file, create a branch: `<user>/<plan-number>-<description>`
 (e.g. `simon/001-rate-limiting`).
 
+Refer to Available Tools for the appropriate CLI commands for the issue tracker in use.
 If the tracker CLI is unavailable or the API call fails, warn and continue.
 
 ### A. Understand the Context
@@ -116,8 +114,7 @@ When all milestones are done:
 
 1. Summarise deliverables to user
 2. If the plan came from an issue tracker, update the issue status to "In Review"
-   (or nearest equivalent):
-   - Linear: `ak linear update-issue PLAT-123 --status "In Review"`
+   (or nearest equivalent). Refer to Available Tools for the appropriate CLI commands.
 3. If the plan is a local file, move it to a `done/` subdirectory alongside it
    (e.g. `plans/done/`)
 4. Ask: "Implementation complete. Would you like to enter Review Mode?"
