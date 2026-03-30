@@ -2,6 +2,7 @@
 
 import sys
 from importlib.resources import as_file, files
+from pathlib import Path
 
 import click
 
