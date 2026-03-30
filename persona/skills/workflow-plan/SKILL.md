@@ -79,10 +79,13 @@ Examples:
 3. **Investigate the Codebase** — before asking the user anything, explore the codebase to answer
    discoverable questions: existing patterns, conventions, dependencies, relevant modules.
    Use `action-analyze-codebase` for unfamiliar repos.
-   Also check project documentation (README, CONTRIBUTING, AGENTS.md) for issue tracking
-   conventions. If docs mention a tracker (Linear, GitHub Issues, etc.) with configuration
-   details (e.g. team key), note it for use after plan approval. If no tracker is mentioned,
-   skip issue tracking silently.
+   Also check project documentation (README, CONTRIBUTING, AGENTS.md) and any available
+   context for issue tracking conventions. If a tracker is identified (Linear, GitHub
+   Issues, etc.) with configuration details (e.g. team key), note it for use after plan
+   approval. If no tracker is mentioned anywhere, skip issue tracking silently.
+
+   If multiple sources indicate different trackers, prefer: the user's explicit instruction,
+   then project documentation, then defaults from context.
 
 4. **Resolve the Decision Tree** — systematically walk through each branch of the design space.
    For each open question:
