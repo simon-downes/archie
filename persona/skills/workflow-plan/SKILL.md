@@ -54,6 +54,10 @@ Examples:
 - `./plans/001-rate-limiting.md`
 - `./plans/002-agent-kit-linear.md`
 
+**Issue linkage:** when linked to an issue tracker, the first line of the plan file is
+`<!-- issue: PLAT-123 -->` (invisible in rendered markdown, machine-readable by the
+implement skill). See [references/ISSUE-FORMAT.md](references/ISSUE-FORMAT.md).
+
 ---
 
 # Four-Phase Planning Process
@@ -64,11 +68,17 @@ Examples:
 
 1. **Write Objective** — concise problem description and desired outcome (2-4 sentences)
 
-2. **Analyse Initial Input** — identify core objective, what's stated, what's implied, obvious gaps
+2. **Analyse Initial Input** — identify core objective, what's stated, what's implied, obvious gaps.
+   If the user references an existing issue (e.g. "plan for PLAT-123"), fetch the issue to use
+   its title, description, and comments as additional context for planning.
 
 3. **Investigate the Codebase** — before asking the user anything, explore the codebase to answer
    discoverable questions: existing patterns, conventions, dependencies, relevant modules.
    Use `action-analyze-codebase` for unfamiliar repos.
+   Also check project documentation (README, CONTRIBUTING, AGENTS.md) for issue tracking
+   conventions. If docs mention a tracker (Linear, GitHub Issues, etc.) with configuration
+   details (e.g. team key), note it for use after plan approval. If no tracker is mentioned,
+   skip issue tracking silently.
 
 4. **Resolve the Decision Tree** — systematically walk through each branch of the design space.
    For each open question:
@@ -175,6 +185,14 @@ See [references/MILESTONES.md](references/MILESTONES.md) for detailed rules and 
 4. **Present complete plan** — show all four phases together.
 
 **Approval Gate:** "Here is the complete plan. Shall we move to Implementation Mode?"
+
+5. **Link to issue tracker** — if a tracker was discovered in Phase 1:
+   - Add `<!-- issue: IDENTIFIER -->` as the first line of the plan file
+   - If an existing issue was referenced, update its description with the plan embedded
+     between `<!-- plan:start -->` and `<!-- plan:end -->` markers
+   - If no existing issue, create one with the plan title and embedded plan content
+   - See [references/ISSUE-FORMAT.md](references/ISSUE-FORMAT.md) for format details
+   - If the tracker CLI is unavailable or the API call fails, warn and continue
 
 ---
 

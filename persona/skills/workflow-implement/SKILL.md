@@ -38,6 +38,9 @@ Verify it contains: Objective, Requirements, Technical Design, and Milestones.
 
 If incomplete or unclear → ask for clarification before proceeding.
 
+**Issue linkage:** check if the plan file starts with `<!-- issue: IDENTIFIER -->`. If
+present, note the identifier for status updates during implementation.
+
 **Resuming:** If milestones are partially complete, check `git log`
 to identify the last completed milestone. Confirm with the user, then continue from
 the next one.
@@ -45,6 +48,16 @@ the next one.
 ## 2. Execute Each Milestone
 
 For each milestone, work through these steps:
+
+### Setup (first milestone only)
+
+If an issue identifier is linked:
+- Update the issue status to "In Progress" (or nearest equivalent)
+- Create a branch from the default branch: `<user>/<ISSUE-KEY>-<description>`
+
+If no issue identifier, just create a branch following project conventions.
+
+If the tracker CLI is unavailable or the API call fails, warn and continue.
 
 ### A. Understand the Context
 
@@ -100,8 +113,9 @@ After each milestone:
 When all milestones are done:
 
 1. Summarise deliverables to user
-2. Move the plan to a `done/` subdirectory alongside it (e.g. `plans/done/`)
-3. Ask: "Implementation complete. Would you like to enter Review Mode?"
+2. If an issue identifier is linked, update the issue status to "In Review" (or nearest equivalent)
+3. Move the plan to a `done/` subdirectory alongside it (e.g. `plans/done/`)
+4. Ask: "Implementation complete. Would you like to enter Review Mode?"
 
 ---
 

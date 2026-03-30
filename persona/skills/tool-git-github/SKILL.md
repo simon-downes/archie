@@ -28,30 +28,32 @@ Git workflows (branching, syncing, rebasing) follow standard patterns. GitHub PR
 
 Unless steering file specifies otherwise, always use trunk-based workflow.
 
-## JIRA Integration
+## Issue Integration
 
-**Branch naming includes JIRA key:**
+**Branch naming includes issue key:**
 
-**Format:** `<user>/<JIRA-KEY>-<description>`
+**Format:** `<user>/<ISSUE-KEY>-<description>`
 
 **Rules:**
-- JIRA issue key MUST be UPPERCASE
+- Issue key MUST match the tracker's format (e.g. PLAT-123 for Linear/JIRA, 42 for GitHub)
 - Description MUST be lowercase with hyphens
 - User prefix SHOULD be your GitHub username
 
 **Examples:**
 ```
-simon/PLAT-123-add-user-auth
-simon/PLAT-456-fix-memory-leak
+simon/PLAT-123-add-user-auth       # Linear or JIRA
+simon/42-fix-memory-leak            # GitHub Issues
 ```
 
-**PR body SHOULD list related JIRA tickets at the top:**
+**PR body SHOULD reference related issues at the top:**
 
 ```
-JIRA: PLAT-123, PLAT-124
+PLAT-123
 
 [rest of PR description]
 ```
+
+For GitHub Issues, use closing keywords to auto-close: `Closes #42`
 
 ## Git Workflows
 

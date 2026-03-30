@@ -166,6 +166,17 @@ and cross-cutting view.
 
 Merge findings from qa-runner, code-reviewer, and plan alignment into a single report.
 
+## 6. Post-review actions
+
+If the verdict is APPROVE or APPROVE WITH SUGGESTIONS, and the plan file contains an
+issue identifier (`<!-- issue: IDENTIFIER -->`):
+- Create a pull request linking to the issue (include the identifier in the PR body)
+- The issue remains in its current status — PR merge handles the final transition
+
+If no issue identifier is present, offer to create a PR if the work is on a feature branch.
+
+If the tracker CLI is unavailable or the API call fails, warn and continue.
+
 ---
 
 # Review Dimensions
