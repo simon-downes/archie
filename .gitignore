@@ -6,3 +6,7 @@ dist/
 .ruff_cache/
 
 agent-kit
+
+# Scratch files
+_style_guide.py
+*.chat
