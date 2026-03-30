@@ -14,7 +14,7 @@ Execute approved plans by working through milestones sequentially.
 # When to Use
 
 - User approves a plan and requests implementation
-- Executing milestones from `~/plans/<project>/<date>-<description>-PLAN.md`
+- Executing milestones from `./plans/<NNN>-<description>.md`
 
 # When Not to Use
 
@@ -29,10 +29,10 @@ Execute approved plans by working through milestones sequentially.
 
 Read the plan file:
 ```
-~/plans/<project>/<date>-<description>-PLAN.md
+./plans/<NNN>-<description>.md
 ```
 
-If no path specified, list `~/plans/<project>/` to show available plans and ask which one.
+If no path specified, list `./plans/` to show available plans and ask which one.
 
 Verify it contains: Objective, Requirements, Technical Design, and Milestones.
 
@@ -100,8 +100,8 @@ After each milestone:
 When all milestones are done:
 
 1. Summarise deliverables to user
-
-2. Ask: "Implementation complete. Would you like to enter Review Mode?"
+2. Move the plan to a `done/` subdirectory alongside it (e.g. `plans/done/`)
+3. Ask: "Implementation complete. Would you like to enter Review Mode?"
 
 ---
 
@@ -150,7 +150,7 @@ See [references/PROBLEM-HANDLING.md](references/PROBLEM-HANDLING.md) for detaile
 
 **User:** "Let's implement the plan"
 
-1. Load `~/plans/api-service/2026-03-07-rate-limiting-PLAN.md`
+1. Load `./plans/001-rate-limiting.md`
 2. Milestone 1: Read Approach (use ioredis, key format, TTL strategy), explore
    existing Redis config and patterns, implement Tasks, run qa-runner, verify
 3. Commit, report to user

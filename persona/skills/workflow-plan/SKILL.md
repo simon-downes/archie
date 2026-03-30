@@ -31,8 +31,28 @@ that can be implemented in a future session with zero existing context.
 
 # Planning Artifacts
 
-Plans are stored as:
-- `~/plans/<project>/<date>-<description>-PLAN.md` — complete plan document
+Plans are stored in `./plans/` relative to the project root.
+
+**File naming:** `<NNN>-<description>.md` where `<NNN>` is a zero-padded incrementing number.
+To determine the next number, check both `./plans/` and `./plans/done/` for the highest
+existing number and increment.
+
+**Completed plans:** move to `./plans/done/` when fully implemented. The number is preserved.
+
+**Determining the project root:**
+1. The nearest ancestor directory containing `.git` (handles sub-projects with own repos)
+2. The `ARCHIE_PROJECT_ROOT` environment variable (handles new projects without git)
+3. If neither is available, ask the user
+
+When working in a sub-project (e.g. `agent-kit/` inside `archie/`), the sub-project's
+`.git` takes precedence — plans go in the sub-project's `./plans/`.
+
+**Confirm the plan location** before writing when the project root is ambiguous or when
+working in a sub-project.
+
+Examples:
+- `./plans/001-rate-limiting.md`
+- `./plans/002-agent-kit-linear.md`
 
 ---
 

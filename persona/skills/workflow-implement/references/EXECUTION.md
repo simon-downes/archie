@@ -6,7 +6,7 @@ Complete walkthrough of implementing a rate limiting feature.
 
 Plan exists at:
 ```
-~/plans/api-service/2026-03-07-rate-limiting-PLAN.md
+./plans/001-rate-limiting.md
 ```
 
 Contains: Objective, Requirements, Technical Design, 3 Milestones.

@@ -126,7 +126,7 @@ def run_container(command: list[str], tool_name: str = "shell") -> int:
     if sys.stdin.isatty():
         args.append("-it")
 
-    for name, value in {**env, **creds}.items():
+    for name, value in {**env, **creds, "ARCHIE_PROJECT_ROOT": container_project}.items():
         args.extend(["-e", f"{name}={value}"])
 
     for host_path, container_mount in mounts:

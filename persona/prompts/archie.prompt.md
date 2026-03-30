@@ -189,7 +189,7 @@ After investigating a request, if the work is non-trivial, recommend creating a 
 
 2. **Persist the plan** to:
    ```
-   ~/plans/<project>/<YYYY-MM-DD>-<description>-PLAN.md
+   ./plans/<NNN>-<description>.md
    ```
 
 After plan approval, ask: "Shall we begin implementation?"
