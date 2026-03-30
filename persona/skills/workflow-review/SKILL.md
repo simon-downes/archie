@@ -168,12 +168,11 @@ Merge findings from qa-runner, code-reviewer, and plan alignment into a single r
 
 ## 6. Post-review actions
 
-If the verdict is APPROVE or APPROVE WITH SUGGESTIONS, and the plan file contains an
-issue identifier (`<!-- issue: IDENTIFIER -->`):
-- Create a pull request linking to the issue (include the identifier in the PR body)
-- The issue remains in its current status — PR merge handles the final transition
-
-If no issue identifier is present, offer to create a PR if the work is on a feature branch.
+If the verdict is APPROVE or APPROVE WITH SUGGESTIONS and the work is on a feature branch:
+- Create a pull request
+- If the plan came from an issue tracker, include the issue identifier in the PR body
+- The issue should already be in "In Review" (set by workflow-implement) — no status
+  change needed. PR merge handles the final transition.
 
 If the tracker CLI is unavailable or the API call fails, warn and continue.
 

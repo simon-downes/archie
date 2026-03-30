@@ -2,7 +2,7 @@
 name: workflow-implement
 description: >
   Execute approved implementation plans through milestone-based workflow with progress
-  tracking. Use when implementing approved plans from PLAN.md files.
+  tracking. Use when implementing approved plans from local plan files or issue tracker.
 ---
 
 # Purpose
@@ -27,19 +27,17 @@ Execute approved plans by working through milestones sequentially.
 
 ## 1. Load Plan
 
-Read the plan file:
-```
-./plans/<NNN>-<description>.md
-```
+The plan source depends on how it was created:
 
-If no path specified, list `./plans/` to show available plans and ask which one.
+**From issue tracker:** the user provides an issue identifier (e.g. "implement PLAT-123").
+Fetch the issue and read the plan from its description.
 
-Verify it contains: Objective, Requirements, Technical Design, and Milestones.
+**From local file:** read from `./plans/<NNN>-<description>.md`. If no path specified,
+list `./plans/` to show available plans and ask which one.
+
+Verify the plan contains: Objective, Requirements, Technical Design, and Milestones.
 
 If incomplete or unclear → ask for clarification before proceeding.
-
-**Issue linkage:** check if the plan file starts with `<!-- issue: IDENTIFIER -->`. If
-present, note the identifier for status updates during implementation.
 
 **Resuming:** If milestones are partially complete, check `git log`
 to identify the last completed milestone. Confirm with the user, then continue from
@@ -51,11 +49,15 @@ For each milestone, work through these steps:
 
 ### Setup (first milestone only)
 
-If an issue identifier is linked:
+If the plan came from an issue tracker (identifier format indicates the tracker:
+`PLAT-123` → Linear via `ak linear`, `#42` → GitHub via `gh`):
 - Update the issue status to "In Progress" (or nearest equivalent)
+  - Linear: `ak linear update-issue PLAT-123 --status "In Progress"`
+  - GitHub: handled automatically by branch/PR conventions
 - Create a branch from the default branch: `<user>/<ISSUE-KEY>-<description>`
 
-If no issue identifier, just create a branch following project conventions.
+If the plan is a local file, create a branch: `<user>/<plan-number>-<description>`
+(e.g. `simon/001-rate-limiting`).
 
 If the tracker CLI is unavailable or the API call fails, warn and continue.
 
@@ -113,8 +115,11 @@ After each milestone:
 When all milestones are done:
 
 1. Summarise deliverables to user
-2. If an issue identifier is linked, update the issue status to "In Review" (or nearest equivalent)
-3. Move the plan to a `done/` subdirectory alongside it (e.g. `plans/done/`)
+2. If the plan came from an issue tracker, update the issue status to "In Review"
+   (or nearest equivalent):
+   - Linear: `ak linear update-issue PLAT-123 --status "In Review"`
+3. If the plan is a local file, move it to a `done/` subdirectory alongside it
+   (e.g. `plans/done/`)
 4. Ask: "Implementation complete. Would you like to enter Review Mode?"
 
 ---
@@ -139,11 +144,11 @@ Complete the current milestone as planned, then:
 Stop and discuss with user:
 
 1. Explain the specific issue
-2. Propose concrete amendments to PLAN.md
+2. Propose concrete amendments to the plan
 3. Show changes in diff format
 4. Wait for approval
 
-**Never modify PLAN.md without explicit approval.**
+**Never modify the plan without explicit approval.**
 
 See [references/PROBLEM-HANDLING.md](references/PROBLEM-HANDLING.md) for detailed examples.
 

@@ -1,61 +1,47 @@
 # Issue Tracking Format
 
-## Plan File Header
+## Plan Storage
 
-When a plan is linked to an issue, the first line of the plan file is a comment with the
-issue identifier:
+When an issue tracker is available, the plan lives in the issue description — no local
+plan files are created. The issue identifier (e.g. PLAT-123, #42) is the plan identifier.
 
-```markdown
-<!-- issue: PLAT-123 -->
-# Plan Title
+When no tracker is available, plans are stored as local files in `./plans/`.
 
-## Objective
-...
-```
+## Issue Description as Plan
 
-This allows the implement skill to find the linked issue without parsing the plan content.
+The full plan content (Objective, Requirements, Technical Design, Milestones) is written
+as the issue description. The issue title is the plan title.
 
-## Issue Description Embedding
+When updating an existing issue's description with a plan, the plan replaces the entire
+description. If the original description contains important context, incorporate it into
+the plan's Objective section.
 
-Plan content is embedded in the issue description between boundary markers:
-
-```markdown
-Original issue description or summary here.
-
-<!-- plan:start -->
-## Objective
-...
-## Requirements
-...
-## Milestones
-...
-<!-- plan:end -->
-```
-
-### Updating an Existing Issue
-
-When updating an issue that already has content:
-
-1. Read the current description
-2. If `<!-- plan:start -->` and `<!-- plan:end -->` markers exist, replace everything
-   between them (preserving content before and after the markers)
-3. If no markers exist, append the markers and plan content after the existing description
-4. Write the updated description back
-
-### CLI Commands
+## CLI Commands
 
 **Linear:**
 ```bash
-# Create with description
-ak linear create-issue --team PLAT --title "Plan title" --description "content"
+# Create issue with plan as description (pipe content via stdin for large plans)
+echo "$PLAN_CONTENT" | ak linear create-issue --team PLAT --title "Plan title"
 
-# Update description (flag or stdin for large content)
-ak linear update-issue PLAT-123 --description "content"
-cat description.md | ak linear update-issue PLAT-123
+# Update existing issue description (stdin for large content)
+echo "$PLAN_CONTENT" | ak linear update-issue PLAT-123
+
+# Read issue (to load plan for implementation)
+ak linear issue PLAT-123
+
+# Update status during implementation
+ak linear update-issue PLAT-123 --status "In Progress"
+ak linear update-issue PLAT-123 --status "In Review"
 ```
 
 **GitHub Issues:**
 ```bash
-gh issue create --title "Plan title" --body "content"
-gh issue edit <number> --body "content"
+# Create issue with plan as description
+gh issue create --title "Plan title" --body "$PLAN_CONTENT"
+
+# Update existing issue
+gh issue edit <number> --body "$PLAN_CONTENT"
+
+# Read issue
+gh issue view <number>
 ```

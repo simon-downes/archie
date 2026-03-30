@@ -31,7 +31,15 @@ that can be implemented in a future session with zero existing context.
 
 # Planning Artifacts
 
-Plans are stored in `./plans/` relative to the project root.
+Plans are stored in one of two places depending on whether an issue tracker is available:
+
+**With issue tracker:** the plan lives in the issue description. The issue identifier
+(e.g. PLAT-123, #42) is the plan identifier. No local plan files are created.
+
+**Without issue tracker:** plans are stored as local files in `./plans/` relative to the
+project root.
+
+## Local Plan Files (no tracker)
 
 **File naming:** `<NNN>-<description>.md` where `<NNN>` is a zero-padded incrementing number.
 To determine the next number, check both `./plans/` and `./plans/done/` for the highest
@@ -53,10 +61,6 @@ working in a sub-project.
 Examples:
 - `./plans/001-rate-limiting.md`
 - `./plans/002-agent-kit-linear.md`
-
-**Issue linkage:** when linked to an issue tracker, the first line of the plan file is
-`<!-- issue: PLAT-123 -->` (invisible in rendered markdown, machine-readable by the
-implement skill). See [references/ISSUE-FORMAT.md](references/ISSUE-FORMAT.md).
 
 ---
 
@@ -186,13 +190,14 @@ See [references/MILESTONES.md](references/MILESTONES.md) for detailed rules and 
 
 **Approval Gate:** "Here is the complete plan. Shall we move to Implementation Mode?"
 
-5. **Link to issue tracker** — if a tracker was discovered in Phase 1:
-   - Add `<!-- issue: IDENTIFIER -->` as the first line of the plan file
-   - If an existing issue was referenced, update its description with the plan embedded
-     between `<!-- plan:start -->` and `<!-- plan:end -->` markers
-   - If no existing issue, create one with the plan title and embedded plan content
-   - See [references/ISSUE-FORMAT.md](references/ISSUE-FORMAT.md) for format details
-   - If the tracker CLI is unavailable or the API call fails, warn and continue
+5. **Persist the plan:**
+   - **With tracker:** if a tracker was discovered in Phase 1, create or update the issue
+     with the full plan as the issue description. If an existing issue was referenced,
+     update its description. If no existing issue, create one with the plan title.
+     The issue identifier is the plan identifier — no local file is created.
+     If the tracker CLI is unavailable or the API call fails, fall back to a local file.
+   - **Without tracker:** write the plan to a local file in `./plans/` (see Planning
+     Artifacts above).
 
 ---
 

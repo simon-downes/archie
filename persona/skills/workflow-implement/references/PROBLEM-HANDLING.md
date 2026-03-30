@@ -67,7 +67,7 @@ Stop, explain issue, propose concrete amendments, show diff, wait for approval.
 Issue: Plan specifies Redis TTL for rate limits, but this loses 
 partial progress when keys expire.
 
-Proposed change to PLAN.md Technical Design:
+Proposed change to plan Technical Design:
 
 - Current: "Use Redis TTL for automatic cleanup"
 + Proposed: "Use sliding window with sorted sets for accurate limiting"
@@ -77,7 +77,7 @@ This requires updating Milestone 1 to implement sorted set storage.
 Approve this change?
 ```
 
-**Never modify PLAN.md without explicit approval.**
+**Never modify the plan without explicit approval.**
 
 ## Escalation Template
 
