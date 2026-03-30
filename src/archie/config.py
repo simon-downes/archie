@@ -41,6 +41,10 @@ DEFAULT_CONFIG = {
             "type": "static",
             "fields": ["access_key_id", "secret_access_key", "session_token"],
         },
+        "scalr": {
+            "type": "static",
+            "fields": ["token", "hostname"],
+        },
     },
     "credentials": {
         "GH_TOKEN": "github.token",
@@ -48,6 +52,8 @@ DEFAULT_CONFIG = {
         "AWS_ACCESS_KEY_ID": "aws.access_key_id",
         "AWS_SECRET_ACCESS_KEY": "aws.secret_access_key",
         "AWS_SESSION_TOKEN": "aws.session_token",
+        "SCALR_TOKEN": "scalr.token",
+        "SCALR_HOSTNAME": "scalr.hostname",
     },
     "mounts": [
         ["~/.archie/persona/agents", "~/.kiro/agents"],

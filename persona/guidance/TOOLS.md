@@ -89,6 +89,56 @@ redis-cli -h <hostname> -p 6379 --tls
 `nc` (netcat) for TCP port checks, `ping` for ICMP reachability, `dig`/`nslookup` for DNS.
 Most AWS services don't respond to ICMP — prefer `nc -zv <host> <port>` for connectivity testing.
 
+## Scalr CLI
+
+Terraform management platform CLI. Used for inspecting runs, debugging errors, and querying
+environment/workspace configuration. Credentials via `SCALR_TOKEN` and `SCALR_HOSTNAME` env vars.
+
+Output is JSON by default. Pipe to `jq` for filtering.
+
+**Inspecting runs (most common use case):**
+```bash
+# List recent runs for a workspace
+scalr get-runs -filter-workspace <workspace-id>
+
+# List failed runs
+scalr get-runs -filter-workspace <workspace-id> -filter-status errored
+
+# Get run details (include plan and apply info)
+scalr get-run -run <run-id> -include plan,apply
+
+# View plan log (terraform plan output)
+scalr get-plan-log -plan <plan-id>
+
+# View apply log
+scalr get-apply-log -apply <apply-id>
+```
+
+**Querying workspaces and environments:**
+```bash
+# List all workspaces (filter by name or environment)
+scalr get-workspaces -filter-name "my-workspace"
+scalr get-workspaces -filter-environment <env-id>
+
+# Get workspace details
+scalr get-workspace -workspace <workspace-id>
+
+# List environments
+scalr list-environments
+
+# Get environment details
+scalr get-environment -environment <env-id>
+
+# Get workspace variables
+scalr get-workspaces  # then inspect variables from workspace details
+```
+
+**Debugging workflow:** Find the workspace → list runs → get the failed run → read the plan/apply log.
+
+**When to use:** Investigating failed Terraform runs, checking workspace configuration,
+understanding environment structure. All creation and naming is managed via Terraform in a
+separate repo — Scalr CLI is read-only inspection.
+
 ## Agent Kit (ak)
 
 CLI toolkit for structured access to SaaS APIs. Outputs JSON to stdout, errors to stderr.
