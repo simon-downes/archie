@@ -66,12 +66,16 @@ def image_info() -> dict | None:
 
 def build_image(context_path: Path) -> None:
     """Build the sandbox Docker image."""
+    import time
+
     result = _docker(
         "build",
         "--build-arg",
         f"USERNAME={HOST_USERNAME}",
         "--build-arg",
         f"USER_UID={HOST_UID}",
+        "--build-arg",
+        f"CACHEBUST_AK={int(time.time())}",
         "-t",
         IMAGE_NAME,
         str(context_path),
