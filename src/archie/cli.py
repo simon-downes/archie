@@ -229,19 +229,33 @@ def status(as_json: bool) -> None:
 @main.command()
 def build() -> None:
     """Build the sandbox Docker image."""
+    # Try package data first (installed mode), then source tree (editable mode)
     sandbox_pkg = files("archie").joinpath("sandbox", "Dockerfile")
-    if not sandbox_pkg.is_file():
-        print_error("Dockerfile not found in package data")
-        sys.exit(1)
+    if sandbox_pkg.is_file():
+        print_info(f"Building [{C_KEY}]{IMAGE_NAME}[/] image...")
+        try:
+            with as_file(sandbox_pkg) as dockerfile:
+                build_image(dockerfile.parent)
+            print_success(f"Built [{C_KEY}]{IMAGE_NAME}[/]")
+            return
+        except RuntimeError as e:
+            print_error(str(e))
+            sys.exit(1)
 
-    print_info(f"Building [{C_KEY}]{IMAGE_NAME}[/] image...")
-    try:
-        with as_file(sandbox_pkg) as dockerfile:
-            build_image(dockerfile.parent)
-        print_success(f"Built [{C_KEY}]{IMAGE_NAME}[/]")
-    except RuntimeError as e:
-        print_error(str(e))
-        sys.exit(1)
+    # Editable install: look relative to the source tree
+    source_dockerfile = Path(__file__).resolve().parent.parent.parent / "sandbox" / "Dockerfile"
+    if source_dockerfile.is_file():
+        print_info(f"Building [{C_KEY}]{IMAGE_NAME}[/] image...")
+        try:
+            build_image(source_dockerfile.parent)
+            print_success(f"Built [{C_KEY}]{IMAGE_NAME}[/]")
+            return
+        except RuntimeError as e:
+            print_error(str(e))
+            sys.exit(1)
+
+    print_error("Dockerfile not found in package data or source tree")
+    sys.exit(1)
 
 
 @main.command()
