@@ -45,6 +45,10 @@ DEFAULT_CONFIG = {
             "type": "static",
             "fields": ["token", "hostname"],
         },
+        "linear": {
+            "type": "static",
+            "fields": ["token"],
+        },
     },
     "credentials": {
         "GH_TOKEN": "github.token",
@@ -54,6 +58,7 @@ DEFAULT_CONFIG = {
         "AWS_SESSION_TOKEN": "aws.session_token",
         "SCALR_TOKEN": "scalr.token",
         "SCALR_HOSTNAME": "scalr.hostname",
+        "LINEAR_TOKEN": "linear.token",
     },
     "mounts": [
         ["~/.archie/persona/agents", "~/.kiro/agents"],

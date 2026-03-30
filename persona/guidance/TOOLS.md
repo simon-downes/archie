@@ -142,7 +142,7 @@ separate repo — Scalr CLI is read-only inspection.
 ## Agent Kit (ak)
 
 CLI toolkit for structured access to SaaS APIs. Outputs JSON to stdout, errors to stderr.
-Credentials come from environment variables (e.g. `NOTION_TOKEN`).
+Credentials come from environment variables (e.g. `NOTION_TOKEN`, `LINEAR_TOKEN`).
 
 ### ak notion — Notion Integration
 
@@ -189,3 +189,48 @@ the allowlist. If a fetch is rejected with a scope error, the page is outside th
 access boundary.
 
 
+
+
+### ak linear — Linear Integration
+
+Direct GraphQL API. Requires `LINEAR_TOKEN` env var.
+
+**Structure and context:**
+```bash
+# List teams and their workflow states
+ak linear teams
+ak linear team PLAT
+
+# List projects
+ak linear projects --team PLAT
+```
+
+**Issues:**
+```bash
+# List issues with filters (names resolved to IDs automatically)
+ak linear issues --team PLAT --status "In Progress" --limit 10
+ak linear issues --team PLAT --assignee "Simon" --label "Bug"
+
+# Get full issue detail
+ak linear issue PLAT-123
+
+# Create and update
+ak linear create-issue --team PLAT --title "Fix bug" --status "Ready" --priority 2
+ak linear update-issue PLAT-123 --status "Done"
+```
+
+**Comments:**
+```bash
+ak linear comments PLAT-123
+ak linear comment PLAT-123 --message "Looks good"
+```
+
+**File upload:**
+```bash
+ak linear upload ./screenshot.png
+# Returns asset URL for embedding in descriptions/comments
+```
+
+**When to use:** Managing Linear issues, checking issue status, creating/updating issues,
+adding comments. Use `ak linear team <key>` to discover available statuses before filtering
+or updating. Prefer `--limit` to keep output concise.
