@@ -197,7 +197,7 @@ RUN uv tool install batrachian-toad
 ARG CACHEBUST_AK=1
 RUN uv tool install git+https://github.com/simon-downes/agent-kit.git
 
-# Ensure user's tool bin is in PATH (ARG not available in ENV, so use RUN)
-RUN echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+# Ensure user's tool bin is in PATH
+ENV PATH="/home/${USERNAME}/.local/bin:${PATH}"
 
 CMD ["/bin/bash"]
