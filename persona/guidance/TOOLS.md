@@ -234,3 +234,24 @@ ak linear upload ./screenshot.png
 **When to use:** Managing Linear issues, checking issue status, creating/updating issues,
 adding comments. Use `ak linear team <key>` to discover available statuses before filtering
 or updating. Prefer `--limit` to keep output concise.
+
+### ak slack — Slack Integration
+
+Send messages via incoming webhooks. Requires `SLACK_WEBHOOK_URL` env var.
+
+```bash
+# Simple text message (supports mrkdwn)
+ak slack send "Deploy complete :white_check_mark:"
+
+# With header and fields
+ak slack send "All checks passed" --header "Deploy Complete" --field "App=my-app" --field "Env=prod"
+
+# Pipe text from another command
+echo "Build finished" | ak slack send
+
+# Raw Block Kit JSON from stdin
+echo '{"text":"fallback","blocks":[...]}' | ak slack send --json
+```
+
+**When to use:** Sending notifications, alerts, and status updates to Slack channels.
+Use `--header` and `--field` for structured messages, `--json` for full Block Kit control.

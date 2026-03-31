@@ -49,6 +49,10 @@ DEFAULT_CONFIG = {
             "type": "static",
             "fields": ["token"],
         },
+        "slack": {
+            "type": "static",
+            "fields": ["webhook_url"],
+        },
     },
     "credentials": {
         "GH_TOKEN": "github.token",
@@ -59,6 +63,7 @@ DEFAULT_CONFIG = {
         "SCALR_TOKEN": "scalr.token",
         "SCALR_HOSTNAME": "scalr.hostname",
         "LINEAR_TOKEN": "linear.token",
+        "SLACK_WEBHOOK_URL": "slack.webhook_url",
     },
     "mounts": [
         ["~/.archie/persona/agents", "~/.kiro/agents"],
