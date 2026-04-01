@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     unzip \
     zip \
+    poppler-utils \
     procps \
     dnsutils \
     wget \
