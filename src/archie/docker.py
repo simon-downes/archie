@@ -64,6 +64,16 @@ def image_info() -> dict | None:
     return {"created": created, "size": size}
 
 
+def _get_gh_token() -> str:
+    """Read GitHub token from credential store, or return empty string."""
+    try:
+        from archie.auth import get_field
+
+        return get_field("github", "token") or ""
+    except Exception:
+        return ""
+
+
 def build_image(context_path: Path) -> None:
     """Build the sandbox Docker image."""
     import time
@@ -74,6 +84,8 @@ def build_image(context_path: Path) -> None:
         f"USERNAME={HOST_USERNAME}",
         "--build-arg",
         f"USER_UID={HOST_UID}",
+        "--build-arg",
+        f"GH_TOKEN={os.environ.get('GH_TOKEN') or _get_gh_token()}",
         "--build-arg",
         f"CACHEBUST_AK={int(time.time())}",
         "-t",
