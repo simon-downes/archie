@@ -280,4 +280,4 @@ Terraform modules MUST follow semantic versioning (semver: MAJOR.MINOR.PATCH).
 - `fix:` → PATCH version bump (bug fixes, backward compatible)
 - `refactor:`, `docs:`, `chore:` → PATCH version bump (if released)
 
-**Commit format follows tool-git-github skill conventions.**
+**Commit format follows tool-git skill conventions.**

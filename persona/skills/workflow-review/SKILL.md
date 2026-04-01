@@ -116,11 +116,11 @@ Based on how the skill was invoked:
 
 **Standalone / PR review:**
 - User specifies files → use those
-- PR number provided → use `gh` to retrieve PR context (see tool-git-github skill
-  for PR commands):
-  - `gh pr view <number>` — PR description, metadata, and author intent
-  - `gh pr diff <number>` — the changeset
-  - `gh pr view <number> --json commits` — commit messages for intent inference
+- PR number provided → use `tool-git` to retrieve PR context (load the source provider
+  reference for PR commands):
+  - View PR description, metadata, and author intent
+  - View the changeset (diff)
+  - View commit messages for intent inference
 - No PR or files specified → ask
 
 For all modes, get the full current content of changed files (not just diff hunks)
@@ -169,12 +169,13 @@ Merge findings from qa-runner, code-reviewer, and plan alignment into a single r
 ## 6. Post-review actions
 
 If the verdict is APPROVE or APPROVE WITH SUGGESTIONS and the work is on a feature branch:
-- Create a pull request
+- Create a pull request using `tool-git` (load the source provider reference)
 - If the plan came from an issue tracker, include the issue identifier in the PR body
+- Use `tool-slack` to send a PR notification (no-op if Slack is unconfigured)
 - The issue should already be in "In Review" (set by workflow-implement) — no status
   change needed. PR merge handles the final transition.
 
-If the tracker CLI is unavailable or the API call fails, warn and continue.
+If issue operations fail, warn and continue.
 
 ---
 

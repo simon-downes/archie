@@ -50,14 +50,14 @@ For each milestone, work through these steps:
 ### Setup (first milestone only)
 
 If the plan came from an issue tracker:
-- Update the issue status to "In Progress" (or nearest equivalent)
+- Update the issue status to "In Progress" (or nearest equivalent) using `tool-issues`
 - Create a branch from the default branch: `<user>/<ISSUE-KEY>-<description>`
 
 If the plan is a local file, create a branch: `<user>/<plan-number>-<description>`
 (e.g. `simon/001-rate-limiting`).
 
-Refer to Available Tools for the appropriate CLI commands for the issue tracker in use.
-If the tracker CLI is unavailable or the API call fails, warn and continue.
+Use `tool-project-config` to resolve the project config, then use `tool-issues` for
+issue operations. If no issue tracker is configured, skip issue operations silently.
 
 ### A. Understand the Context
 
@@ -100,7 +100,7 @@ git add -A
 git commit -m "<type>: <milestone description>"
 ```
 
-Use conventional commit format (see tool-git-github skill).
+Use conventional commit format (see tool-git skill).
 
 ### E. Report and Continue
 
@@ -114,7 +114,7 @@ When all milestones are done:
 
 1. Summarise deliverables to user
 2. If the plan came from an issue tracker, update the issue status to "In Review"
-   (or nearest equivalent). Refer to Available Tools for the appropriate CLI commands.
+   (or nearest equivalent) using `tool-issues`.
 3. If the plan is a local file, move it to a `done/` subdirectory alongside it
    (e.g. `plans/done/`)
 4. Ask: "Implementation complete. Would you like to enter Review Mode?"

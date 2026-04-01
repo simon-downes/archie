@@ -18,10 +18,13 @@ the plan's Objective section.
 
 ## Operations
 
-Refer to Available Tools for the appropriate CLI commands for the issue tracker in use.
+Refer to `tool-issues` for the appropriate operations for the configured issue tracker.
 
 The key operations are:
-- **Create issue** with title and description (plan content, piped via stdin for large plans)
+- **Create issue** with title and description (plan content)
 - **Update issue description** (to revise the plan)
 - **Read issue** (to load the plan for implementation)
 - **Update issue status** (to reflect workflow progress: "In Progress", "In Review")
+
+Use `tool-issues` to perform these operations. The skill dispatches to the correct
+provider based on project config.

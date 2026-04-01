@@ -50,9 +50,9 @@ Provides operational guidance for using a specific CLI tool or system.
 - Repository/environment assumptions
 - Covers the full surface area of a tool or closely related tool family
 
-**Scope:** One tool or closely related tool family (e.g., git-github, not "all version control")
+**Scope:** One tool or closely related tool family (e.g., git + source provider, not "all version control")
 
-**Examples:** `tool-git-github`, `tool-aws`
+**Examples:** `tool-git`, `tool-issues`, `tool-aws`
 
 ---
 

@@ -79,13 +79,13 @@ Examples:
 3. **Investigate the Codebase** — before asking the user anything, explore the codebase to answer
    discoverable questions: existing patterns, conventions, dependencies, relevant modules.
    Use `action-analyze-codebase` for unfamiliar repos.
-   Also check project documentation (README, CONTRIBUTING, AGENTS.md) and any available
-   context for issue tracking conventions. If a tracker is identified (Linear, GitHub
-   Issues, etc.) with configuration details (e.g. team key), note it for use after plan
-   approval. If no tracker is mentioned anywhere, skip issue tracking silently.
+   Also check project documentation (README, CONTRIBUTING, AGENTS.md) and use
+   `tool-project-config` to resolve the project config. If an issue tracker is
+   configured (`issues.provider`), note it for use after plan approval. If no
+   tracker is configured, skip issue tracking silently.
 
    If multiple sources indicate different trackers, prefer: the user's explicit instruction,
-   then project documentation, then defaults from context.
+   then project config (`tool-project-config`), then project documentation.
 
 4. **Resolve the Decision Tree** — systematically walk through each branch of the design space.
    For each open question:
@@ -194,11 +194,12 @@ See [references/MILESTONES.md](references/MILESTONES.md) for detailed rules and 
 **Approval Gate:** "Here is the complete plan. Shall we move to Implementation Mode?"
 
 5. **Persist the plan:**
-   - **With tracker:** if a tracker was discovered in Phase 1, create or update the issue
-     with the full plan as the issue description. If an existing issue was referenced,
-     update its description. If no existing issue, create one with the plan title.
+   - **With tracker:** if an issue tracker was identified via `tool-project-config`,
+     use `tool-issues` to create or update the issue with the full plan as the issue
+     description. If an existing issue was referenced, update its description. If no
+     existing issue, create one with the plan title.
      The issue identifier is the plan identifier — no local file is created.
-     If the tracker CLI is unavailable or the API call fails, fall back to a local file.
+     If the issue operation fails, fall back to a local file.
    - **Without tracker:** write the plan to a local file in `./plans/` (see Planning
      Artifacts above).
 
