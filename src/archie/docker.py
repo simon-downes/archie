@@ -64,34 +64,30 @@ def image_info() -> dict | None:
     return {"created": created, "size": size}
 
 
-def _get_gh_token() -> str:
-    """Read GitHub token from credential store, or return empty string."""
-    try:
-        from archie.auth import get_field
+def _target_arch() -> str:
+    """Map platform machine to Docker TARGETARCH value."""
+    import platform
 
-        return get_field("github", "token") or ""
-    except Exception:
-        return ""
+    machine = platform.machine()
+    return {"x86_64": "amd64", "aarch64": "arm64", "arm64": "arm64"}.get(machine, "amd64")
 
 
-def build_image(context_path: Path) -> None:
+def build_image(context_path: Path, *, no_cache: bool = False) -> None:
     """Build the sandbox Docker image."""
     import time
 
-    result = _docker(
-        "build",
-        "--build-arg",
-        f"USERNAME={HOST_USERNAME}",
-        "--build-arg",
-        f"USER_UID={HOST_UID}",
-        "--build-arg",
-        f"GH_TOKEN={os.environ.get('GH_TOKEN') or _get_gh_token()}",
-        "--build-arg",
-        f"CACHEBUST_AK={int(time.time())}",
-        "-t",
-        IMAGE_NAME,
+    args = ["build"]
+    if no_cache:
+        args.append("--no-cache")
+    args.extend([
+        "--build-arg", f"TARGETARCH={_target_arch()}",
+        "--build-arg", f"USERNAME={HOST_USERNAME}",
+        "--build-arg", f"USER_UID={HOST_UID}",
+        "--build-arg", f"CACHEBUST_AK={int(time.time())}",
+        "-t", IMAGE_NAME,
         str(context_path),
-    )
+    ])
+    result = _docker(*args)
     if result.returncode != 0:
         raise RuntimeError(f"Build failed with exit code {result.returncode}")
 

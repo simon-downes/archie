@@ -228,7 +228,8 @@ def status(as_json: bool) -> None:
 
 
 @main.command()
-def build() -> None:
+@click.option("--no-cache", is_flag=True, help="Build without using Docker cache.")
+def build(no_cache: bool) -> None:
     """Build the sandbox Docker image."""
     # Try package data first (installed mode), then source tree (editable mode)
     sandbox_pkg = files("archie").joinpath("sandbox", "Dockerfile")
@@ -236,7 +237,7 @@ def build() -> None:
         print_info(f"Building [{C_KEY}]{IMAGE_NAME}[/] image...")
         try:
             with as_file(sandbox_pkg) as dockerfile:
-                build_image(dockerfile.parent)
+                build_image(dockerfile.parent, no_cache=no_cache)
             print_success(f"Built [{C_KEY}]{IMAGE_NAME}[/]")
             return
         except RuntimeError as e:
@@ -248,7 +249,7 @@ def build() -> None:
     if source_dockerfile.is_file():
         print_info(f"Building [{C_KEY}]{IMAGE_NAME}[/] image...")
         try:
-            build_image(source_dockerfile.parent)
+            build_image(source_dockerfile.parent, no_cache=no_cache)
             print_success(f"Built [{C_KEY}]{IMAGE_NAME}[/]")
             return
         except RuntimeError as e:

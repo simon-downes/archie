@@ -1,91 +1,6 @@
-## ---------- Fetcher stage: download GitHub releases ----------
-FROM debian:bookworm-slim AS fetcher
-
-ARG TARGETARCH
-ARG GH_TOKEN=""
-
-RUN apt-get update && apt-get install -y curl unzip && rm -rf /var/lib/apt/lists/*
-
-# Set up GitHub auth if token provided
-RUN if [ -n "$GH_TOKEN" ]; then \
-        printf 'machine github.com\n  login x-access-token\n  password %s\n' "$GH_TOKEN" > /root/.netrc && \
-        chmod 600 /root/.netrc; \
-    fi
-
-# Helper: resolve latest version from GitHub redirect
-# Usage: $(gh_version owner/repo) → tag (e.g. "0.68.0" or "v1.2.3")
-RUN echo '#!/bin/sh\ncurl --netrc-optional -sL -o /dev/null -w "%{url_effective}" "https://github.com/$1/releases/latest" | sed "s|.*/tag/||"' \
-        > /usr/local/bin/gh_version && chmod +x /usr/local/bin/gh_version
-
-RUN mkdir -p /out/bin /out/aws-cli
-
-# difftastic
-RUN V=$(gh_version Wilfred/difftastic) && \
-    case ${TARGETARCH} in amd64) A="x86_64";; arm64) A="aarch64";; esac && \
-    curl --netrc-optional -sL "https://github.com/Wilfred/difftastic/releases/download/${V}/difft-${A}-unknown-linux-gnu.tar.gz" \
-        | tar -xz -C /out/bin
-
-# xh
-RUN V=$(gh_version ducaale/xh) && \
-    case ${TARGETARCH} in amd64) A="x86_64";; arm64) A="aarch64";; esac && \
-    curl --netrc-optional -sL "https://github.com/ducaale/xh/releases/download/${V}/xh-${V}-${A}-unknown-linux-musl.tar.gz" \
-        | tar -xz --strip-components=1 -C /out/bin --wildcards '*/xh'
-
-# just
-RUN V=$(gh_version casey/just) && \
-    case ${TARGETARCH} in amd64) A="x86_64";; arm64) A="aarch64";; esac && \
-    curl --netrc-optional -sL "https://github.com/casey/just/releases/download/${V}/just-${V}-${A}-unknown-linux-musl.tar.gz" \
-        | tar -xz -C /out/bin just
-
-# shfmt
-RUN V=$(gh_version mvdan/sh) && \
-    case ${TARGETARCH} in amd64) A="amd64";; arm64) A="arm64";; esac && \
-    curl --netrc-optional -sL "https://github.com/mvdan/sh/releases/download/${V}/shfmt_${V}_linux_${A}" \
-        -o /out/bin/shfmt
-
-# jq
-RUN curl --netrc-optional -sL "https://github.com/jqlang/jq/releases/latest/download/jq-linux-${TARGETARCH}" \
-        -o /out/bin/jq
-
-# yq
-RUN curl --netrc-optional -sL "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${TARGETARCH}" \
-        -o /out/bin/yq
-
-# GitHub CLI
-RUN V=$(gh_version cli/cli | sed 's/^v//') && \
-    curl --netrc-optional -sL "https://github.com/cli/cli/releases/download/v${V}/gh_${V}_linux_${TARGETARCH}.tar.gz" \
-        | tar -xz --strip-components=2 -C /out/bin --wildcards '*/bin/gh'
-
-# OpenTofu
-RUN V=$(gh_version opentofu/opentofu | sed 's/^v//') && \
-    curl --netrc-optional -sL "https://github.com/opentofu/opentofu/releases/download/v${V}/tofu_${V}_linux_${TARGETARCH}.zip" \
-        -o /tmp/tofu.zip && \
-    unzip -o /tmp/tofu.zip tofu -d /out/bin
-
-# terraform-docs
-RUN V=$(gh_version terraform-docs/terraform-docs) && \
-    curl --netrc-optional -sL "https://github.com/terraform-docs/terraform-docs/releases/download/${V}/terraform-docs-${V}-linux-${TARGETARCH}.tar.gz" \
-        | tar -xz -C /out/bin terraform-docs
-
-# Scalr CLI
-RUN V=$(gh_version Scalr/scalr-cli) && \
-    curl --netrc-optional -sL "https://github.com/Scalr/scalr-cli/releases/download/${V}/scalr-cli_${V#v}_linux_${TARGETARCH}.zip" \
-        -o /tmp/scalr.zip && \
-    unzip -o /tmp/scalr.zip scalr -d /out/bin
-
-# AWS CLI v2
-RUN case ${TARGETARCH} in amd64) A="x86_64";; arm64) A="aarch64";; esac && \
-    curl -sL "https://awscli.amazonaws.com/awscli-exe-linux-${A}.zip" -o /tmp/aws.zip && \
-    unzip /tmp/aws.zip -d /tmp && \
-    /tmp/aws/install --install-dir /out/aws-cli --bin-dir /out/bin
-
-# Make all binaries executable
-RUN chmod +x /out/bin/*
-
-
-## ---------- Final image ----------
 FROM debian:bookworm-slim
 
+# Build args for user creation
 ARG USERNAME
 ARG USER_UID
 ARG TARGETARCH
@@ -148,9 +63,106 @@ RUN UV_PYTHON_INSTALL_DIR=/usr/local uv python install && \
     ln -s "$PYTHON_PATH/bin/python3" /usr/local/bin/python3 && \
     ln -s /usr/local/bin/python3 /usr/local/bin/python
 
-# Copy binaries from fetcher stage
-COPY --from=fetcher /out/bin/ /usr/local/bin/
-COPY --from=fetcher /out/aws-cli/ /usr/local/aws-cli/
+# Install difftastic
+RUN DIFFT_VERSION=$(curl -s https://api.github.com/repos/Wilfred/difftastic/releases/latest | grep '"tag_name"' | cut -d'"' -f4) && \
+    case ${TARGETARCH} in \
+        amd64) DIFFT_ARCH="x86_64" ;; \
+        arm64) DIFFT_ARCH="aarch64" ;; \
+    esac && \
+    curl -L "https://github.com/Wilfred/difftastic/releases/download/${DIFFT_VERSION}/difft-${DIFFT_ARCH}-unknown-linux-gnu.tar.gz" \
+        -o /tmp/difft.tar.gz && \
+    tar -xzf /tmp/difft.tar.gz -C /usr/local/bin && \
+    chmod +x /usr/local/bin/difft && \
+    rm /tmp/difft.tar.gz
+
+# Install xh
+RUN XH_VERSION=$(curl -s https://api.github.com/repos/ducaale/xh/releases/latest | grep '"tag_name"' | cut -d'"' -f4) && \
+    case ${TARGETARCH} in \
+        amd64) XH_ARCH="x86_64" ;; \
+        arm64) XH_ARCH="aarch64" ;; \
+    esac && \
+    curl -L "https://github.com/ducaale/xh/releases/download/${XH_VERSION}/xh-${XH_VERSION}-${XH_ARCH}-unknown-linux-musl.tar.gz" \
+        -o /tmp/xh.tar.gz && \
+    tar -xzf /tmp/xh.tar.gz -C /tmp && \
+    mv /tmp/xh-${XH_VERSION}-${XH_ARCH}-unknown-linux-musl/xh /usr/local/bin/ && \
+    chmod +x /usr/local/bin/xh && \
+    rm -rf /tmp/xh*
+
+# Install just
+RUN JUST_VERSION=$(curl -s https://api.github.com/repos/casey/just/releases/latest | grep '"tag_name"' | cut -d'"' -f4) && \
+    case ${TARGETARCH} in \
+        amd64) JUST_ARCH="x86_64" ;; \
+        arm64) JUST_ARCH="aarch64" ;; \
+    esac && \
+    curl -L "https://github.com/casey/just/releases/download/${JUST_VERSION}/just-${JUST_VERSION}-${JUST_ARCH}-unknown-linux-musl.tar.gz" \
+        -o /tmp/just.tar.gz && \
+    tar -xzf /tmp/just.tar.gz -C /usr/local/bin just && \
+    chmod +x /usr/local/bin/just && \
+    rm /tmp/just.tar.gz
+
+# Install shfmt
+RUN SHFMT_VERSION=$(curl -s https://api.github.com/repos/mvdan/sh/releases/latest | grep '"tag_name"' | cut -d'"' -f4) && \
+    case ${TARGETARCH} in \
+        amd64) SHFMT_ARCH="amd64" ;; \
+        arm64) SHFMT_ARCH="arm64" ;; \
+    esac && \
+    curl -L "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_${SHFMT_ARCH}" \
+        -o /usr/local/bin/shfmt && \
+    chmod +x /usr/local/bin/shfmt
+
+# Install jq
+RUN curl -L "https://github.com/jqlang/jq/releases/latest/download/jq-linux-${TARGETARCH}" \
+        -o /usr/local/bin/jq && \
+    chmod +x /usr/local/bin/jq
+
+# Install yq
+RUN curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${TARGETARCH}" \
+        -o /usr/local/bin/yq && \
+    chmod +x /usr/local/bin/yq
+
+# Install GitHub CLI
+RUN GH_VERSION=$(curl -s https://api.github.com/repos/cli/cli/releases/latest | grep '"tag_name"' | cut -d'"' -f4 | sed 's/v//') && \
+    curl -L "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${TARGETARCH}.tar.gz" \
+        -o /tmp/gh.tar.gz && \
+    tar -xzf /tmp/gh.tar.gz -C /tmp && \
+    mv /tmp/gh_${GH_VERSION}_linux_${TARGETARCH}/bin/gh /usr/local/bin/ && \
+    rm -rf /tmp/gh*
+
+# Install AWS CLI v2
+RUN case ${TARGETARCH} in \
+        amd64) AWS_ARCH="x86_64" ;; \
+        arm64) AWS_ARCH="aarch64" ;; \
+        *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
+    esac && \
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-${AWS_ARCH}.zip" -o /tmp/awscliv2.zip && \
+    unzip /tmp/awscliv2.zip -d /tmp && \
+    /tmp/aws/install && \
+    rm -rf /tmp/aws*
+
+# Install OpenTofu
+RUN TOFU_VERSION=$(curl -s https://api.github.com/repos/opentofu/opentofu/releases/latest | grep '"tag_name"' | cut -d'"' -f4 | sed 's/v//') && \
+    curl -L "https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_linux_${TARGETARCH}.zip" \
+        -o /tmp/tofu.zip && \
+    unzip /tmp/tofu.zip -d /usr/local/bin && \
+    chmod +x /usr/local/bin/tofu && \
+    rm /tmp/tofu.zip
+
+# Install terraform-docs
+RUN TF_DOCS_VERSION=$(curl -s https://api.github.com/repos/terraform-docs/terraform-docs/releases/latest | grep '"tag_name"' | cut -d'"' -f4) && \
+    curl -L "https://github.com/terraform-docs/terraform-docs/releases/download/${TF_DOCS_VERSION}/terraform-docs-${TF_DOCS_VERSION}-linux-${TARGETARCH}.tar.gz" \
+        -o /tmp/terraform-docs.tar.gz && \
+    tar -xzf /tmp/terraform-docs.tar.gz -C /usr/local/bin terraform-docs && \
+    chmod +x /usr/local/bin/terraform-docs && \
+    rm /tmp/terraform-docs.tar.gz
+
+# Install Scalr CLI
+RUN SCALR_VERSION=$(curl -fsSL https://api.github.com/repos/Scalr/scalr-cli/releases/latest | grep -oP '"tag_name": "\K(.*)(?=")') && \
+    curl -fsSL "https://github.com/Scalr/scalr-cli/releases/download/${SCALR_VERSION}/scalr-cli_${SCALR_VERSION#v}_linux_${TARGETARCH}.zip" \
+        -o scalr.zip && \
+    unzip scalr.zip -d /tmp/scalr && \
+    mv /tmp/scalr/scalr /usr/local/bin/scalr && \
+    chmod +x /usr/local/bin/scalr && \
+    rm -rf scalr.zip /tmp/scalr
 
 # Pre-seed GitHub SSH host keys
 RUN ssh-keyscan github.com >> /etc/ssh/ssh_known_hosts 2>/dev/null
