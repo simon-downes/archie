@@ -11,6 +11,7 @@ import yaml
 ARCHIE_HOME = Path.home() / ".archie"
 CONFIG_PATH = ARCHIE_HOME / "config.yaml"
 PERSONA_PATH = ARCHIE_HOME / "persona"
+PROJECTS_PATH = ARCHIE_HOME / "projects.yaml"
 
 DEFAULT_CONFIG = {
     "project_dir": "~/dev",
@@ -72,8 +73,10 @@ DEFAULT_CONFIG = {
         ["~/.archie/persona/guidance", "~/.kiro/steering"],
         ["~/Library/Application Support/kiro-cli", "~/.local/share/kiro-cli"],
         "~/.toad",
+        ["~/.archie/aws.config", "~/.aws/config:ro"],
         ["~/.gitconfig", "~/.gitconfig:ro"],
         ["~/.ssh", "~/.ssh:ro"],
+        ["~/.archie/projects.yaml", "~/.archie/projects.yaml:ro"],
     ],
 }
 
@@ -125,6 +128,10 @@ def install() -> None:
     # Create config if missing
     if not CONFIG_PATH.exists():
         _write_config(DEFAULT_CONFIG)
+
+    # Create projects config if missing
+    if not PROJECTS_PATH.exists():
+        _write_starter_projects()
 
 
 def load_config() -> dict:
@@ -303,3 +310,41 @@ def _write_config(config: dict) -> None:
     InlineListDumper.add_representer(list, represent_list)
 
     CONFIG_PATH.write_text(yaml.dump(config, Dumper=InlineListDumper, sort_keys=False))
+
+
+_STARTER_PROJECTS = """\
+# Project configuration — maps git orgs/repos to providers and settings.
+# Archie resolves the current project from the git remote origin and merges
+# org defaults with any project-level overrides.
+
+orgs: {}
+  # <org-name>:
+  #
+  #   # Source control provider
+  #   # Values: github, bitbucket
+  #   source:
+  #     provider: github
+  #
+  #   # Issue tracker
+  #   # Values: linear, github
+  #   issues:
+  #     provider: linear
+  #     team: PLAT              # default team key for this org
+  #
+  #   # Slack notifications (posts on PR creation)
+  #   # Set to the env var name that holds the webhook URL
+  #   slack:
+  #     webhook_env: SLACK_WEBHOOK_URL
+
+# Per-project overrides — keys here are merged on top of the org config.
+# Format: <org-name>/<project-name>
+projects: {}
+  # <org-name>/<project-name>:
+  #   issues:
+  #     team: INFRA             # override the org default team
+"""
+
+
+def _write_starter_projects() -> None:
+    """Write a commented starter projects.yaml."""
+    PROJECTS_PATH.write_text(_STARTER_PROJECTS)
