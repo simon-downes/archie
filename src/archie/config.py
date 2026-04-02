@@ -2,6 +2,7 @@
 
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from importlib.resources import as_file, files
 from pathlib import Path
@@ -12,6 +13,14 @@ ARCHIE_HOME = Path.home() / ".archie"
 CONFIG_PATH = ARCHIE_HOME / "config.yaml"
 PERSONA_PATH = ARCHIE_HOME / "persona"
 PROJECTS_PATH = ARCHIE_HOME / "projects.yaml"
+
+# macOS stores kiro data in ~/Library/Application Support/kiro-cli
+# Linux stores it in ~/.local/share/kiro-cli (XDG default)
+_KIRO_DATA_DIR = (
+    "~/Library/Application Support/kiro-cli"
+    if sys.platform == "darwin"
+    else "~/.local/share/kiro-cli"
+)
 
 DEFAULT_CONFIG = {
     "project_dir": "~/dev",
@@ -71,11 +80,12 @@ DEFAULT_CONFIG = {
         ["~/.archie/persona/skills", "~/.kiro/skills"],
         ["~/.archie/persona/prompts", "~/.kiro/prompts"],
         ["~/.archie/persona/guidance", "~/.kiro/steering"],
-        ["~/Library/Application Support/kiro-cli", "~/.local/share/kiro-cli"],
+        [_KIRO_DATA_DIR, "~/.local/share/kiro-cli"],
         "~/.toad",
         ["~/.archie/aws.config", "~/.aws/config:ro"],
-        ["~/.gitconfig", "~/.gitconfig:ro"],
-        ["~/.ssh", "~/.ssh:ro"],
+        "~/.gitconfig:ro",
+        ["~/.ssh/id_ed25519", "~/.ssh/id_ed25519:ro"],
+        ["~/.ssh/id_ed25519.pub", "~/.ssh/id_ed25519.pub:ro"],
         ["~/.archie/projects.yaml", "~/.archie/projects.yaml:ro"],
     ],
 }
@@ -178,7 +188,12 @@ def check_status() -> StatusCheck:
 
     # Missing mounts?
     for entry in config.get("mounts", []):
-        src = entry if isinstance(entry, str) else entry[0]
+        if isinstance(entry, str):
+            src, _ = _split_mount_options(entry)
+        elif isinstance(entry, list) and len(entry) >= 1:
+            src = entry[0]
+        else:
+            continue
         host_path = Path(src).expanduser()
         if not host_path.exists():
             status.missing_mounts.append(src)
@@ -223,37 +238,64 @@ def resolve_env(config: dict) -> dict[str, str]:
     return env
 
 
+def _split_mount_options(path: str) -> tuple[str, str]:
+    """Split a path from trailing Docker mount options (e.g. :ro).
+
+    Returns (path, options) where options includes the leading colon or is empty.
+    Only splits on the last colon that isn't part of a ~ home prefix.
+    """
+    stripped = path.lstrip("~")
+    if ":" in stripped:
+        path_part, _, options = path.rpartition(":")
+        return path_part, f":{options}"
+    return path, ""
+
+
 def resolve_mounts(config: dict) -> list[tuple[str, str]]:
     """Resolve mount entries to (host_path, container_mount) pairs.
 
     container_mount may include Docker options like :ro.
 
     Entries can be:
-    - str: auto-mapped from host home to container home
+    - str: auto-mapped from host home to container home (supports :ro suffix)
     - list [src, dest]: explicit mapping (dest may include :ro etc.)
+
+    Raises SystemExit on malformed entries.
     """
     from archie.docker import HOST_USERNAME
+    from archie.output import print_error, print_warning
 
     container_home = f"/home/{HOST_USERNAME}"
     host_home = str(Path.home())
     mounts = []
+    errors = []
 
-    for entry in config.get("mounts", []):
+    for i, entry in enumerate(config.get("mounts", [])):
         if isinstance(entry, str):
-            host_path = str(Path(entry).expanduser())
-            container_mount = host_path.replace(host_home, container_home)
-        else:
+            path_part, options = _split_mount_options(entry)
+            host_path = str(Path(path_part).expanduser())
+            container_mount = host_path.replace(host_home, container_home) + options
+        elif isinstance(entry, list):
+            if len(entry) != 2:
+                errors.append(f"  mount[{i}]: list must have 2 elements [src, dest], got {entry}")
+                continue
             host_path = str(Path(entry[0]).expanduser())
-            # Split off any Docker options (e.g. :ro) before path substitution
-            dest = entry[1]
-            if ":" in dest.lstrip("~"):
-                path_part, _, options = dest.rpartition(":")
-                container_mount = f"{path_part.replace('~', container_home)}:{options}"
-            else:
-                container_mount = dest.replace("~", container_home)
+            path_part, options = _split_mount_options(entry[1])
+            container_mount = path_part.replace("~", container_home) + options
+        else:
+            errors.append(
+                f"  mount[{i}]: expected string or [src, dest] list, got {type(entry).__name__}"
+            )
+            continue
 
         if Path(host_path).exists():
             mounts.append((host_path, container_mount))
+        else:
+            print_warning(f"Mount skipped — path not found: {host_path}")
+
+    if errors:
+        print_error("Invalid mount configuration:\n" + "\n".join(errors))
+        raise SystemExit(1)
 
     return mounts
 

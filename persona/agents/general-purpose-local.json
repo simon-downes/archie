@@ -1,0 +1,50 @@
+{
+  "name": "general-purpose-local",
+  "description": "General-purpose read-only subagent for research, investigation, and ad-hoc tasks on the host",
+  "tools": ["read", "glob", "grep", "shell", "code", "web_search", "web_fetch"],
+  "allowedTools": ["read", "glob", "grep", "shell", "code", "web_search", "web_fetch"],
+  "resources": [
+    "file://README.md",
+    "file://CONTRIBUTING.md"
+  ],
+  "toolsSettings": {
+    "shell": {
+      "autoAllowReadonly": true,
+      "denyByDefault": true,
+      "allowedCommands": [
+        "ak( .*)?",
+        "tree( .*)?",
+        "wc( .*)?",
+        "head( .*)?",
+        "tail( .*)?",
+        "cat( .*)?",
+        "find( .*)?",
+        "ls( .*)?",
+        "pwd",
+        "git ls-files( .*)?",
+        "git log( .*)?",
+        "git diff( .*)?",
+        "git show( .*)?",
+        "git status( .*)?",
+        "git branch( .*)?",
+        "jq( .*)?",
+        "yq( .*)?",
+        "rg( .*)?",
+        "fd( .*)?"
+      ],
+      "deniedCommands": [
+        ".*\\brm\\b.*",
+        ".*\\bsudo\\b.*",
+        ".*\\bgit\\s+(push|commit|reset|rebase|clean|checkout|merge|add)\\b.*",
+        ".*\\b(npm|pnpm|yarn)\\s+(i|install|ci|add|link|dedupe|rebuild)\\b.*",
+        ".*\\buv\\s+(sync|pip|add|lock|tool\\s+install|venv)\\b.*",
+        ".*\\b(pip|pip3)\\s+install\\b.*",
+        ".*\\b(brew|apt|apt-get|yum|dnf|pacman|apk)\\b.*",
+        ".*\\bpython3?\\b.*",
+        ".*\\bphp\\b.*",
+        ".*\\bnode\\b.*",
+        ".*\\bcurl\\b.*"
+      ]
+    }
+  }
+}

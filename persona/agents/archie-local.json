@@ -1,0 +1,81 @@
+{
+  "name": "archie-local",
+  "description": "Host-native engineering agent with restricted write and shell access for local development",
+  "prompt": "file://../prompts/archie.prompt.md",
+  "model": "claude-opus-4.6",
+  "mcpServers": {
+    "aws-knowledge": {
+      "command": "uvx",
+      "args": ["fastmcp", "run", "https://knowledge-mcp.global.api.aws"]
+    },
+    "fetch": {
+      "command": "uvx",
+      "args": ["mcp-server-fetch"]
+    }
+  },
+  "tools": [
+    "read",
+    "write",
+    "glob",
+    "grep",
+    "shell",
+    "web_search",
+    "web_fetch",
+    "use_subagent",
+    "introspect",
+    "code",
+    "@aws-knowledge",
+    "@fetch"
+  ],
+  "allowedTools": [
+    "read",
+    "write",
+    "glob",
+    "grep",
+    "web_search",
+    "web_fetch",
+    "use_subagent",
+    "introspect",
+    "code",
+    "@aws-knowledge",
+    "@fetch"
+  ],
+  "toolAliases": {
+    "@fetch/fetch": "fetch",
+    "@aws-knowledge": "awsdocs"
+  },
+  "toolsSettings": {
+    "write": {
+      "allowedPaths": ["./**"]
+    },
+    "shell": {
+      "autoAllowReadonly": true,
+      "deniedCommands": [
+        ".*\\brm\\s+-[^\\s]*r.*",
+        ".*\\bsudo\\b.*",
+        ".*\\b(brew|apt|apt-get|yum|dnf|pacman|apk)\\b.*",
+        ".*\\bdocker\\s+(rm|rmi|system\\s+prune)\\b.*"
+      ]
+    },
+    "use_subagent": {
+      "trustedAgents": [
+        "general-purpose-local",
+        "code-reviewer",
+        "plan-reviewer",
+        "qa-runner",
+        "codebase-analyzer"
+      ]
+    }
+  },
+  "resources": [
+    "file://README.md",
+    "file://CONTRIBUTING.md",
+    "file://AGENTS.md",
+    "skill://~/.kiro/steering/TOOLS.md",
+    "file://~/.kiro/steering/LOCAL.md",
+    "skill://~/.kiro/skills/**/SKILL.md"
+  ],
+  "includeMcpJson": false,
+  "keyboardShortcut": "ctrl+shift+p",
+  "welcomeMessage": "Hey {{USER}}, Archie here (local mode). Ready when you are."
+}
