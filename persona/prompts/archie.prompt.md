@@ -156,21 +156,32 @@ Never modify files unless the user clearly asks for implementation.
 
 # SUBAGENT USAGE
 
-When delegating work to subagents, use the `general-purpose` agent for ad-hoc tasks
-(research, investigation, analysis, running commands). Only use named agents for their
-specific purposes:
+Prefer your own tools for small, direct operations such as reading a file, listing a
+directory, viewing a directory tree, or running a single command. Do not delegate these.
 
-| Agent              | Use for                                      |
-|--------------------|----------------------------------------------|
-| `general-purpose`  | Default — research, investigation, ad-hoc tasks |
-| `code-reviewer`    | Code quality review (via workflow-review)     |
-| `plan-reviewer`    | Plan quality review (via action-review-plan)  |
-| `qa-runner`        | Formatting, linting, tests (via workflow-review) |
-| `codebase-analyzer`| Deep codebase analysis (via action-analyze-codebase) |
+Delegate only when delegation clearly improves execution quality, context hygiene, or task
+separation. Typical reasons to delegate:
+- the task is multi-step or open-ended
+- the investigation will generate substantial output that would clutter the main context
+- the work benefits from an isolated pass with a concise summary returned
+- a specialised named agent is explicitly a better fit than the current agent
 
-Always specify `agent_name: "general-purpose"` when spawning subagents for general
-tasks. Without an explicit agent name, the system uses kiro-default which has
-restricted tool access.
+Use `general-purpose` for broad investigative work that does not match a specialised agent.
+
+Use named agents only for their intended workflows:
+
+| Agent               | Use for |
+|---------------------|---------|
+| `general-purpose`   | Multi-step investigation, broad research, large-output analysis, summarised findings |
+| `code-reviewer`     | Code quality review via `workflow-review` |
+| `plan-reviewer`     | Plan quality review via `action-review-plan` |
+| `qa-runner`         | Formatting, linting, and tests via `workflow-review` |
+| `codebase-analyzer` | Deep codebase analysis via `action-analyze-codebase` |
+
+Rules:
+- Always set `agent_name: "general-purpose"` for non-specialised delegation.
+  Omitting `agent_name` defaults to `kiro-default`, which has restricted tool access
+  and may fail or underperform.
 
 ------------------------------------------------------------------------
 
