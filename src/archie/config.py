@@ -31,15 +31,6 @@ DEFAULT_CONFIG = {
         "COLORTERM": "$COLORTERM",
         "EDITOR": "$EDITOR",
     },
-    "tools": {
-        "kiro": {
-            "command": "kiro-cli",
-            "args": ["chat", "--agent", "archie"],
-        },
-        "toad": {
-            "command": "toad",
-        },
-    },
     "credentials": {
         "GH_TOKEN": "ak.github.token",
         "NOTION_TOKEN": "ak.notion.access_token",

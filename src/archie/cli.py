@@ -99,15 +99,35 @@ def _print_not_ready(s) -> None:
         print_error(f"Project directory not found: [{C_VAL}]{s.project_dir}[/]")
 
 
-@click.group(cls=ArchieCLI)
+def _print_not_ready(s) -> None:
+    if not s.docker_installed:
+        print_error(f"[{C_KEY}]Docker[/] is not installed")
+    elif not s.docker_running:
+        print_error(f"[{C_KEY}]Docker[/] is not running")
+    elif not s.project_dir_exists:
+        print_error(f"Project directory not found: [{C_VAL}]{s.project_dir}[/]")
+
+
+@click.group(invoke_without_command=True)
 @click.option("--plain", is_flag=True, help="Disable colours and formatting")
-def main(plain: bool) -> None:
-    """Archie — AI-assisted development toolkit."""
+@click.pass_context
+def main(ctx: click.Context, plain: bool) -> None:
+    """Archie — personal AI platform."""
     if plain:
         from archie.output import console, console_err
 
         console.no_color = True
         console_err.no_color = True
+
+    if ctx.invoked_subcommand is None:
+        if not is_installed():
+            print_error(f"Archie is not installed. Run [{C_CMD}]archie install[/] first.")
+            sys.exit(1)
+        s = check_status()
+        if not s.ready:
+            _print_not_ready(s)
+            sys.exit(1)
+        sys.exit(run_container(["kiro-cli", "chat", "--agent", "archie"]))
 
 
 @main.command(name="install")
