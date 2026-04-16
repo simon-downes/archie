@@ -6,7 +6,6 @@ from pathlib import Path
 
 import click
 
-from archie.auth.cli import auth  # noqa: E402
 from archie.config import check_status, install, is_installed, load_config
 from archie.docker import IMAGE_NAME, build_image, image_info, list_containers, run_container
 from archie.output import (
@@ -28,7 +27,7 @@ from archie.output import (
 )
 
 # Built-in commands that can't be used as tool names
-BUILTIN_COMMANDS = {"install", "status", "build", "shell", "auth", "brain"}
+BUILTIN_COMMANDS = {"install", "status", "build", "shell"}
 
 
 class ArchieCLI(click.Group):
@@ -111,30 +110,12 @@ def main(plain: bool) -> None:
         console_err.no_color = True
 
 
-main.add_command(auth)
-
-
 @main.command(name="install")
 def install_cmd() -> None:
     """Install persona and default config to ~/.archie/."""
     print_info("Installing Archie...")
     install()
     print_success(f"Installed to [{C_VAL}]~/.archie/[/]")
-
-
-@main.command(name="brain")
-@click.argument("name")
-def brain_cmd(name: str) -> None:
-    """Create a brain context with the standard directory structure."""
-    from archie.config import BRAIN_PATH, create_brain_context
-
-    context = BRAIN_PATH / name
-    if context.exists():
-        print_error(f"Brain context [{C_VAL}]{name}[/] already exists")
-        sys.exit(1)
-
-    create_brain_context(name)
-    print_success(f"Created brain context [{C_VAL}]{name}[/] at [{C_VAL}]{context}[/]")
 
 
 @main.command()
@@ -145,7 +126,7 @@ def status(as_json: bool) -> None:
     from datetime import datetime
     from pathlib import Path
 
-    from archie.auth import get_field
+    from archie.auth.inject import _load_ak_credentials
     from archie.config import CONFIG_PATH
 
     s = check_status()
@@ -155,17 +136,24 @@ def status(as_json: bool) -> None:
     img = image_info()
     containers = list_containers()
 
-    auth_services = config.get("auth", {})
+    # Check credential mappings against agent-kit store
+    ak_creds = _load_ak_credentials()
     creds_data = {}
-    for service, svc_config in auth_services.items():
-        svc_type = svc_config.get("type", "static")
-        fields = svc_config.get("fields", ["access_token"] if svc_type == "oauth" else [])
-        has_creds = any(get_field(service, f) is not None for f in fields)
-        expires_at = get_field(service, "expires_at") if svc_type == "oauth" else None
-        creds_data[service] = {
-            "type": svc_type,
-            "configured": has_creds,
-            **({"expires_at": expires_at} if expires_at else {}),
+    for env_name, dotpath in config.get("credentials", {}).items():
+        if not isinstance(dotpath, str) or not dotpath.startswith("ak."):
+            continue
+        parts = dotpath.split(".", 2)
+        if len(parts) != 3:
+            continue
+        service, field = parts[1], parts[2]
+        value = (ak_creds.get(service) or {}).get(field)
+        configured = value is not None
+        expires_at = (ak_creds.get(service) or {}).get("expires_at") if configured else None
+        key = f"{service}.{field}"
+        creds_data[key] = {
+            "env": env_name,
+            "configured": configured,
+            **({"expires_at": str(expires_at)} if expires_at else {}),
         }
 
     mounts_data = []
@@ -207,12 +195,12 @@ def status(as_json: bool) -> None:
     else:
         status_table((False, IMAGE_NAME, "not built"))
 
-    if auth_services:
+    if creds_data:
         section("Credentials")
         rows = []
-        for service, info in creds_data.items():
+        for key, info in creds_data.items():
             detail = ""
-            if info["type"] == "oauth" and info.get("expires_at"):
+            if info.get("expires_at"):
                 try:
                     expiry = datetime.fromisoformat(info["expires_at"])
                     if datetime.now(expiry.tzinfo) > expiry:
@@ -223,7 +211,7 @@ def status(as_json: bool) -> None:
                     pass
             elif not info["configured"]:
                 detail = "not configured"
-            rows.append((info["configured"], service, info["type"], detail))
+            rows.append((info["configured"], f"{info['env']} ← {key}", detail))
         status_table(*rows)
 
     section("Mounts")

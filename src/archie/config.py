@@ -40,41 +40,16 @@ DEFAULT_CONFIG = {
             "command": "toad",
         },
     },
-    "auth": {
-        "github": {
-            "type": "static",
-            "fields": ["token"],
-        },
-        "notion": {
-            "type": "oauth",
-        },
-        "aws": {
-            "type": "static",
-            "fields": ["access_key_id", "secret_access_key", "session_token"],
-        },
-        "scalr": {
-            "type": "static",
-            "fields": ["token", "hostname"],
-        },
-        "linear": {
-            "type": "static",
-            "fields": ["token"],
-        },
-        "slack": {
-            "type": "static",
-            "fields": ["webhook_url"],
-        },
-    },
     "credentials": {
-        "GH_TOKEN": "github.token",
-        "NOTION_TOKEN": "notion.access_token",
-        "AWS_ACCESS_KEY_ID": "aws.access_key_id",
-        "AWS_SECRET_ACCESS_KEY": "aws.secret_access_key",
-        "AWS_SESSION_TOKEN": "aws.session_token",
-        "SCALR_TOKEN": "scalr.token",
-        "SCALR_HOSTNAME": "scalr.hostname",
-        "LINEAR_TOKEN": "linear.token",
-        "SLACK_WEBHOOK_URL": "slack.webhook_url",
+        "GH_TOKEN": "ak.github.token",
+        "NOTION_TOKEN": "ak.notion.access_token",
+        "AWS_ACCESS_KEY_ID": "ak.aws.access_key_id",
+        "AWS_SECRET_ACCESS_KEY": "ak.aws.secret_access_key",
+        "AWS_SESSION_TOKEN": "ak.aws.session_token",
+        "SCALR_TOKEN": "ak.scalr.token",
+        "SCALR_HOSTNAME": "ak.scalr.hostname",
+        "LINEAR_TOKEN": "ak.linear.token",
+        "SLACK_WEBHOOK_URL": "ak.slack.webhook_url",
     },
     "mounts": [
         ["~/.archie/persona/agents", "~/.kiro/agents"],
@@ -82,6 +57,7 @@ DEFAULT_CONFIG = {
         ["~/.archie/persona/prompts", "~/.kiro/prompts"],
         ["~/.archie/persona/guidance", "~/.kiro/steering"],
         ["~/.archie/brain", "~/.archie/brain:ro"],
+        ["~/.agent-kit", "~/.agent-kit:ro"],
         [_KIRO_DATA_DIR, "~/.local/share/kiro-cli"],
         "~/.toad",
         ["~/.archie/aws.config", "~/.aws/config:ro"],
@@ -207,19 +183,17 @@ def check_status() -> StatusCheck:
     # Credential issues?
     from datetime import datetime
 
-    from archie.auth import get_field
+    from archie.auth.inject import _load_ak_credentials
 
-    for service, svc_config in config.get("auth", {}).items():
-        svc_type = svc_config.get("type", "static")
-        if svc_type == "oauth":
-            expires_at = get_field(service, "expires_at")
-            if expires_at:
-                try:
-                    expiry = datetime.fromisoformat(expires_at)
-                    if datetime.now(expiry.tzinfo) > expiry:
-                        status.credential_issues.append(f"{service}: expired")
-                except (ValueError, TypeError):
-                    pass
+    ak_creds = _load_ak_credentials()
+    for service, fields in ak_creds.items():
+        if isinstance(fields, dict) and "expires_at" in fields:
+            try:
+                expiry = datetime.fromisoformat(str(fields["expires_at"]))
+                if datetime.now(expiry.tzinfo) > expiry:
+                    status.credential_issues.append(f"{service}: expired")
+            except (ValueError, TypeError):
+                pass
 
     return status
 
@@ -400,26 +374,19 @@ def _write_starter_projects() -> None:
 
 def _create_brain_skeleton() -> None:
     """Create the initial brain directory structure with a shared context."""
-    create_brain_context("shared")
-
-
-_BRAIN_ENTITY_DIRS = [
-    "me",
-    "contacts",
-    "projects",
-    "knowledge",
-    "goals",
-    "inbox",
-    "outbox",
-    "journal",
-    "raw",
-    "archive",
-]
-
-
-def create_brain_context(name: str) -> Path:
-    """Create a brain context directory with the standard entity subdirectories."""
-    context = BRAIN_PATH / name
-    for subdir in _BRAIN_ENTITY_DIRS:
-        (context / subdir).mkdir(parents=True, exist_ok=True)
-    return context
+    shared = BRAIN_PATH / "shared"
+    if shared.exists():
+        return
+    for subdir in [
+        "me",
+        "contacts",
+        "projects",
+        "knowledge",
+        "goals",
+        "inbox",
+        "outbox",
+        "journal",
+        "raw",
+        "archive",
+    ]:
+        (shared / subdir).mkdir(parents=True, exist_ok=True)
