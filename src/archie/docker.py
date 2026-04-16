@@ -72,18 +72,15 @@ def _target_arch() -> str:
     return {"x86_64": "amd64", "aarch64": "arm64", "arm64": "arm64"}.get(machine, "amd64")
 
 
-def build_image(context_path: Path, *, no_cache: bool = False) -> None:
+def build_image(context_path: Path, *, quick: bool = False) -> None:
     """Build the sandbox Docker image."""
-    import time
-
     args = ["build"]
-    if no_cache:
+    if not quick:
         args.append("--no-cache")
     args.extend([
         "--build-arg", f"TARGETARCH={_target_arch()}",
         "--build-arg", f"USERNAME={HOST_USERNAME}",
         "--build-arg", f"USER_UID={HOST_UID}",
-        "--build-arg", f"CACHEBUST_AK={int(time.time())}",
         "-t", IMAGE_NAME,
         str(context_path),
     ])

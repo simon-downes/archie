@@ -196,7 +196,6 @@ RUN case ${TARGETARCH} in \
 RUN uv tool install batrachian-toad
 
 # Install agent-kit tools as user (frequent updates)
-ARG CACHEBUST_AK=1
 RUN uv tool install git+https://github.com/simon-downes/agent-kit.git
 
 # Ensure user's tool bin is in PATH
