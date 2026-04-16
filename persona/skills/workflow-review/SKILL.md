@@ -190,6 +190,10 @@ relevant based on what changed.
 - **Documentation** — docstrings on public interfaces, comments on non-obvious logic
 
 **Check when relevant:**
+- **Architecture** — cross-cutting strategies, module boundaries, dependency flow.
+  Always relevant for full codebase reviews or changes spanning multiple modules.
+- **API contract** — output format consistency, consumer-appropriateness, token efficiency.
+  Always relevant for CLI tools or libraries with external consumers.
 - **Security** — input validation, secrets handling, auth, error message leakage.
   Always relevant when changes touch: auth, user input, API endpoints, data access,
   configuration, or external integrations.

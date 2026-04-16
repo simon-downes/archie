@@ -13,6 +13,48 @@ report findings with severity and file references.
 
 ---
 
+## Architecture
+
+**When to apply:** full codebase reviews, or when changes touch multiple modules or
+introduce new cross-cutting patterns.
+
+**Check:**
+- Cross-cutting concerns have a unified strategy (error handling, logging, output
+  formatting, configuration) rather than ad-hoc per-module implementations
+- Module boundaries are clean — library/client code doesn't make CLI decisions
+  (sys.exit, output formatting), CLI code doesn't contain business logic
+- Dependency flow is acyclic and follows a clear layering
+- Common patterns are extracted rather than duplicated across modules
+
+**Look for:**
+- The same concern handled differently in each module (e.g. error formatting,
+  credential loading, output structure) without a shared approach
+- Missing abstractions that would reduce per-module boilerplate
+- Tight coupling between layers (library code assuming CLI context)
+- Inconsistent module structure across peer modules
+
+---
+
+## API Contract
+
+**When to apply:** CLI tools, libraries, APIs — anything with consumers.
+
+**Check:**
+- Output format is documented and consistent across commands
+- Output is appropriate for the consumer (structured for machines, readable for humans)
+- Output is proportional — no unnecessary wrapping or verbosity
+- Error contract is clear: exit codes, error format, stderr vs stdout separation
+- Breaking changes to output format are flagged
+
+**Look for:**
+- Commands that produce different output formats without justification
+- Verbose output structures where simpler would suffice (token efficiency for LLM consumers)
+- Errors mixed into stdout (breaks piping/parsing)
+- Undocumented output contracts — consumers can't rely on the format
+- Missing --help documentation for CLI commands
+
+---
+
 ## Coding Standards
 
 **Check:**
