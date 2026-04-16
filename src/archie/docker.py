@@ -77,13 +77,19 @@ def build_image(context_path: Path, *, quick: bool = False) -> None:
     args = ["build"]
     if not quick:
         args.append("--no-cache")
-    args.extend([
-        "--build-arg", f"TARGETARCH={_target_arch()}",
-        "--build-arg", f"USERNAME={HOST_USERNAME}",
-        "--build-arg", f"USER_UID={HOST_UID}",
-        "-t", IMAGE_NAME,
-        str(context_path),
-    ])
+    args.extend(
+        [
+            "--build-arg",
+            f"TARGETARCH={_target_arch()}",
+            "--build-arg",
+            f"USERNAME={HOST_USERNAME}",
+            "--build-arg",
+            f"USER_UID={HOST_UID}",
+            "-t",
+            IMAGE_NAME,
+            str(context_path),
+        ]
+    )
     result = _docker(*args)
     if result.returncode != 0:
         raise RuntimeError(f"Build failed with exit code {result.returncode}")
@@ -139,6 +145,9 @@ def run_container(command: list[str], tool_name: str = "shell") -> int:
         args.extend(["-e", f"{name}={value}"])
 
     for host_path, container_mount in mounts:
+        # Brain is read-write when running from the archie project (life OS session)
+        if project.name == "archie" and container_mount.endswith("/brain:ro"):
+            container_mount = container_mount.removesuffix(":ro")
         args.extend(["-v", f"{host_path}:{container_mount}"])
 
     args.extend([IMAGE_NAME, *command])

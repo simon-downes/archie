@@ -28,7 +28,7 @@ from archie.output import (
 )
 
 # Built-in commands that can't be used as tool names
-BUILTIN_COMMANDS = {"install", "status", "build", "shell", "auth"}
+BUILTIN_COMMANDS = {"install", "status", "build", "shell", "auth", "brain"}
 
 
 class ArchieCLI(click.Group):
@@ -120,6 +120,21 @@ def install_cmd() -> None:
     print_info("Installing Archie...")
     install()
     print_success(f"Installed to [{C_VAL}]~/.archie/[/]")
+
+
+@main.command(name="brain")
+@click.argument("name")
+def brain_cmd(name: str) -> None:
+    """Create a brain context with the standard directory structure."""
+    from archie.config import BRAIN_PATH, create_brain_context
+
+    context = BRAIN_PATH / name
+    if context.exists():
+        print_error(f"Brain context [{C_VAL}]{name}[/] already exists")
+        sys.exit(1)
+
+    create_brain_context(name)
+    print_success(f"Created brain context [{C_VAL}]{name}[/] at [{C_VAL}]{context}[/]")
 
 
 @main.command()

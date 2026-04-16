@@ -12,6 +12,7 @@ import yaml
 ARCHIE_HOME = Path.home() / ".archie"
 CONFIG_PATH = ARCHIE_HOME / "config.yaml"
 PERSONA_PATH = ARCHIE_HOME / "persona"
+BRAIN_PATH = ARCHIE_HOME / "brain"
 PROJECTS_PATH = ARCHIE_HOME / "projects.yaml"
 
 # macOS stores kiro data in ~/Library/Application Support/kiro-cli
@@ -80,6 +81,7 @@ DEFAULT_CONFIG = {
         ["~/.archie/persona/skills", "~/.kiro/skills"],
         ["~/.archie/persona/prompts", "~/.kiro/prompts"],
         ["~/.archie/persona/guidance", "~/.kiro/steering"],
+        ["~/.archie/brain", "~/.archie/brain:ro"],
         [_KIRO_DATA_DIR, "~/.local/share/kiro-cli"],
         "~/.toad",
         ["~/.archie/aws.config", "~/.aws/config:ro"],
@@ -138,6 +140,10 @@ def install() -> None:
     # Create config if missing
     if not CONFIG_PATH.exists():
         _write_config(DEFAULT_CONFIG)
+
+    # Create brain skeleton if missing
+    if not BRAIN_PATH.exists():
+        _create_brain_skeleton()
 
     # Create projects config if missing
     if not PROJECTS_PATH.exists():
@@ -390,3 +396,30 @@ projects: {}
 def _write_starter_projects() -> None:
     """Write a commented starter projects.yaml."""
     PROJECTS_PATH.write_text(_STARTER_PROJECTS)
+
+
+def _create_brain_skeleton() -> None:
+    """Create the initial brain directory structure with a shared context."""
+    create_brain_context("shared")
+
+
+_BRAIN_ENTITY_DIRS = [
+    "me",
+    "contacts",
+    "projects",
+    "knowledge",
+    "goals",
+    "inbox",
+    "outbox",
+    "journal",
+    "raw",
+    "archive",
+]
+
+
+def create_brain_context(name: str) -> Path:
+    """Create a brain context directory with the standard entity subdirectories."""
+    context = BRAIN_PATH / name
+    for subdir in _BRAIN_ENTITY_DIRS:
+        (context / subdir).mkdir(parents=True, exist_ok=True)
+    return context
