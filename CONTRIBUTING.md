@@ -121,6 +121,10 @@ Never put secret values in config. Never put connection/mapping config in creden
 
 ### Persona Changes
 
+The system prompt (`persona/prompts/archie.prompt.md`) contains a "Critical Rules" section.
+These rules exist to counter specific behavioural tendencies in the underlying AI harness
+(kiro-cli) and must be preserved across prompt rewrites. They are functional, not stylistic.
+
 Skills follow a layered naming convention:
 
 | Layer | Prefix | Purpose |
@@ -129,8 +133,23 @@ Skills follow a layered naming convention:
 | Workflow | `workflow-*` | Multi-step orchestration |
 | Tool | `tool-*` | Operational guidance for specific tools |
 | Action | `action-*` | Self-contained tasks |
+| Archie | `archie-*` | Self-referential platform operations |
+
+`archie-*` skills are special — they operate on the archie platform itself and have implicit
+knowledge of its architecture and conventions. They compose other skills (plan, implement,
+review) with archie-specific context.
 
 After editing persona files, run `archie install` to deploy to `~/.archie/persona/`. The `{{USER}}` placeholder in `persona/agents/archie.json` is templated during install.
+
+### Documentation
+
+Architecture decisions and detailed reference material live in `docs/`:
+
+- `docs/vision.md` — design rationale, principles, and phasing
+- `docs/brain.md` — brain structure, entity types, conventions (planned)
+
+Keep README.md as the entry point for understanding and using the project. Keep CONTRIBUTING.md
+for development conventions. Use `docs/` for depth that would clutter either of those.
 
 ### Package Data
 

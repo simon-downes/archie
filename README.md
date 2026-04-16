@@ -1,14 +1,19 @@
 # Archie
 
-Personal AI-assisted development toolkit. Manages Docker sandbox environments where AI coding agents (Kiro, Toad) run with project files, credentials, and configuration mounted from the host.
+Personal AI platform that amplifies your effectiveness across all areas of your life. Archie
+manages your knowledge, understands your context, and acts on your behalf — handling
+operational overhead so you can focus on the work that matters.
 
 ## What It Does
 
-Archie consolidates three concerns into one tool:
+Archie is a single, integrated AI assistant built on four pillars:
 
 - **Persona** — agent configurations, skills, prompts, and guidance that define how Archie behaves
+- **Brain** — a persistent second brain that stores your knowledge, contacts, goals, and context across all areas of your life
 - **Sandbox** — Docker containers with a full development toolchain where agents run
 - **Credentials** — secure storage and injection of API tokens and OAuth credentials into containers
+
+See [docs/vision.md](docs/vision.md) for the full architecture and design rationale.
 
 ## Key Rules
 
@@ -83,6 +88,8 @@ archie/
 │       └── providers.yaml   # Bundled OAuth provider definitions
 ├── sandbox/                 # Where Archie runs
 │   └── Dockerfile           # Sandbox image (Debian + dev tools)
+├── docs/                    # Architecture and reference
+│   └── vision.md            # Design rationale, principles, and phasing
 ├── tests/
 └── pyproject.toml
 ```
@@ -281,10 +288,14 @@ The persona defines Archie's identity — how the AI agent behaves, what it know
 |-----------|----------|
 | `agents/` | Agent configs — one orchestrator (archie) and five subagents |
 | `prompts/` | System prompts defining behaviour and rules |
-| `skills/` | Layered knowledge modules (policy → workflow → tool → action) |
+| `skills/` | Layered knowledge modules (policy → workflow → tool → action → archie) |
 | `guidance/` | Steering files for tool usage and conventions |
 
 The persona is bundled into the Python package and deployed to `~/.archie/persona/` on `archie install`. From there it's mounted into containers at the paths the AI tools expect.
+
+## Documentation
+
+- [Vision & Architecture](docs/vision.md) — design rationale, principles, and phasing
 
 ## Development
 
@@ -304,3 +315,4 @@ archie install
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for project conventions, adding commands, and auth providers.
+
