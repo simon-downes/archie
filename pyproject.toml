@@ -1,6 +1,6 @@
 [project]
 name = "archie"
-version = "0.6.0"
+version = "0.7.0"
 description = "AI-assisted development toolkit"
 requires-python = ">=3.11"
 dependencies = [
@@ -26,7 +26,6 @@ packages = ["src/archie"]
 [tool.hatch.build.targets.wheel.force-include]
 "sandbox/Dockerfile" = "archie/sandbox/Dockerfile"
 "persona" = "archie/persona"
-"src/archie/auth/providers.yaml" = "archie/auth/providers.yaml"
 
 [tool.uv]
 package = true

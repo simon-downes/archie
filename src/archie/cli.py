@@ -6,7 +6,6 @@ from pathlib import Path
 
 import click
 
-from archie.auth.cli import auth  # noqa: E402
 from archie.config import check_status, install, is_installed, load_config
 from archie.docker import IMAGE_NAME, build_image, image_info, list_containers, run_container
 from archie.output import (
@@ -28,7 +27,7 @@ from archie.output import (
 )
 
 # Built-in commands that can't be used as tool names
-BUILTIN_COMMANDS = {"install", "status", "build", "shell", "auth"}
+BUILTIN_COMMANDS = {"install", "status", "build", "shell"}
 
 
 class ArchieCLI(click.Group):
@@ -100,18 +99,35 @@ def _print_not_ready(s) -> None:
         print_error(f"Project directory not found: [{C_VAL}]{s.project_dir}[/]")
 
 
-@click.group(cls=ArchieCLI)
+def _print_not_ready(s) -> None:
+    if not s.docker_installed:
+        print_error(f"[{C_KEY}]Docker[/] is not installed")
+    elif not s.docker_running:
+        print_error(f"[{C_KEY}]Docker[/] is not running")
+    elif not s.project_dir_exists:
+        print_error(f"Project directory not found: [{C_VAL}]{s.project_dir}[/]")
+
+
+@click.group(invoke_without_command=True)
 @click.option("--plain", is_flag=True, help="Disable colours and formatting")
-def main(plain: bool) -> None:
-    """Archie — AI-assisted development toolkit."""
+@click.pass_context
+def main(ctx: click.Context, plain: bool) -> None:
+    """Archie — personal AI platform."""
     if plain:
         from archie.output import console, console_err
 
         console.no_color = True
         console_err.no_color = True
 
-
-main.add_command(auth)
+    if ctx.invoked_subcommand is None:
+        if not is_installed():
+            print_error(f"Archie is not installed. Run [{C_CMD}]archie install[/] first.")
+            sys.exit(1)
+        s = check_status()
+        if not s.ready:
+            _print_not_ready(s)
+            sys.exit(1)
+        sys.exit(run_container(["kiro-cli", "chat", "--agent", "archie"]))
 
 
 @main.command(name="install")
@@ -130,7 +146,7 @@ def status(as_json: bool) -> None:
     from datetime import datetime
     from pathlib import Path
 
-    from archie.auth import get_field
+    from archie.auth.inject import _load_ak_credentials
     from archie.config import CONFIG_PATH
 
     s = check_status()
@@ -140,17 +156,24 @@ def status(as_json: bool) -> None:
     img = image_info()
     containers = list_containers()
 
-    auth_services = config.get("auth", {})
+    # Check credential mappings against agent-kit store
+    ak_creds = _load_ak_credentials()
     creds_data = {}
-    for service, svc_config in auth_services.items():
-        svc_type = svc_config.get("type", "static")
-        fields = svc_config.get("fields", ["access_token"] if svc_type == "oauth" else [])
-        has_creds = any(get_field(service, f) is not None for f in fields)
-        expires_at = get_field(service, "expires_at") if svc_type == "oauth" else None
-        creds_data[service] = {
-            "type": svc_type,
-            "configured": has_creds,
-            **({"expires_at": expires_at} if expires_at else {}),
+    for env_name, dotpath in config.get("credentials", {}).items():
+        if not isinstance(dotpath, str) or not dotpath.startswith("ak."):
+            continue
+        parts = dotpath.split(".", 2)
+        if len(parts) != 3:
+            continue
+        service, field = parts[1], parts[2]
+        value = (ak_creds.get(service) or {}).get(field)
+        configured = value is not None
+        expires_at = (ak_creds.get(service) or {}).get("expires_at") if configured else None
+        key = f"{service}.{field}"
+        creds_data[key] = {
+            "env": env_name,
+            "configured": configured,
+            **({"expires_at": str(expires_at)} if expires_at else {}),
         }
 
     mounts_data = []
@@ -192,12 +215,12 @@ def status(as_json: bool) -> None:
     else:
         status_table((False, IMAGE_NAME, "not built"))
 
-    if auth_services:
+    if creds_data:
         section("Credentials")
         rows = []
-        for service, info in creds_data.items():
+        for key, info in creds_data.items():
             detail = ""
-            if info["type"] == "oauth" and info.get("expires_at"):
+            if info.get("expires_at"):
                 try:
                     expiry = datetime.fromisoformat(info["expires_at"])
                     if datetime.now(expiry.tzinfo) > expiry:
@@ -208,13 +231,30 @@ def status(as_json: bool) -> None:
                     pass
             elif not info["configured"]:
                 detail = "not configured"
-            rows.append((info["configured"], service, info["type"], detail))
+            rows.append((info["configured"], f"{info['env']} ← {key}", detail))
         status_table(*rows)
 
     section("Mounts")
     status_table(
         *[(m["exists"], m["path"], "missing" if not m["exists"] else "") for m in mounts_data]
     )
+
+    from archie.docker import _resolve_brain_dir
+
+    brain_dir = _resolve_brain_dir()
+    section("Brain")
+    if brain_dir.exists():
+        contexts = sorted(
+            d.name for d in brain_dir.iterdir() if d.is_dir() and not d.name.startswith(".")
+        )
+        status_table(
+            (True, "Directory", str(brain_dir)),
+            *[(True, ctx, "") for ctx in contexts]
+            if contexts
+            else [(False, "No contexts", "run 'ak brain create-context shared'")],
+        )
+    else:
+        status_table((False, "Directory", f"{brain_dir} (not found)"))
 
     if containers:
         section("Sessions")
@@ -228,8 +268,8 @@ def status(as_json: bool) -> None:
 
 
 @main.command()
-@click.option("--no-cache", is_flag=True, help="Build without using Docker cache.")
-def build(no_cache: bool) -> None:
+@click.option("--quick", is_flag=True, help="Use Docker cache for faster builds.")
+def build(quick: bool) -> None:
     """Build the sandbox Docker image."""
     # Try package data first (installed mode), then source tree (editable mode)
     sandbox_pkg = files("archie").joinpath("sandbox", "Dockerfile")
@@ -237,7 +277,7 @@ def build(no_cache: bool) -> None:
         print_info(f"Building [{C_KEY}]{IMAGE_NAME}[/] image...")
         try:
             with as_file(sandbox_pkg) as dockerfile:
-                build_image(dockerfile.parent, no_cache=no_cache)
+                build_image(dockerfile.parent, quick=quick)
             print_success(f"Built [{C_KEY}]{IMAGE_NAME}[/]")
             return
         except RuntimeError as e:
@@ -249,7 +289,7 @@ def build(no_cache: bool) -> None:
     if source_dockerfile.is_file():
         print_info(f"Building [{C_KEY}]{IMAGE_NAME}[/] image...")
         try:
-            build_image(source_dockerfile.parent, no_cache=no_cache)
+            build_image(source_dockerfile.parent, quick=quick)
             print_success(f"Built [{C_KEY}]{IMAGE_NAME}[/]")
             return
         except RuntimeError as e:

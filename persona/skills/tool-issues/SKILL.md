@@ -32,10 +32,10 @@ for each provider; Available Tools provides the actual CLI commands.
 
 # Provider Dispatch
 
-1. Use `tool-project-config` to resolve the current project's config
-2. Read `issues.provider` from the config
+1. Use `ak project --config` to resolve the current project's config
+2. Read `brain.issues.provider` from the output
 3. Load `references/provider-<name>.md` for the matching provider
-4. Pass provider-specific settings from config (e.g. `issues.team`) to the operations
+4. Pass provider-specific settings (e.g. `brain.issues.team`) to the operations
 5. If no issues config exists, skip issue operations silently — this is not an error
 
 ## Available Providers

@@ -27,18 +27,11 @@ Notify a Slack channel when a pull request is created, if the project has Slack 
 
 ## 1. Check config
 
-Use `tool-project-config` to resolve the current project's config. Read `slack.webhook_env`.
+Use `ak project --config` to resolve the current project's config. Check `brain.slack`.
 
-If `slack` is not configured, stop — no notification needed. This is not an error.
+If `brain.slack` is not `true`, stop — no notification needed. This is not an error.
 
-## 2. Check webhook availability
-
-The `webhook_env` value is the name of an environment variable holding the webhook URL
-(e.g. `SLACK_WEBHOOK_URL`). Check that the env var is set.
-
-If the env var is not set, stop — no notification possible. This is not an error.
-
-## 3. Send notification
+## 2. Send notification
 
 Post a single-line message with the PR title and link using mrkdwn format.
 
@@ -62,8 +55,8 @@ No headers, no blocks, no fields — just a single line of text.
 
 | Condition                    | Behaviour          |
 |------------------------------|--------------------|
-| No slack config              | Skip silently      |
-| Webhook env var not set      | Skip silently      |
+| `brain.slack` not true       | Skip silently      |
+| Webhook not configured       | Skip silently      |
 | Message send fails           | Warn and continue  |
 
 Slack notifications are informational. Workflow progress MUST NOT be blocked by

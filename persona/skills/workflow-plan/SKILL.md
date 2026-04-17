@@ -49,7 +49,7 @@ existing number and increment.
 
 **Determining the project root:**
 1. The nearest ancestor directory containing `.git` (handles sub-projects with own repos)
-2. The `ARCHIE_PROJECT_ROOT` environment variable (handles new projects without git)
+2. The output of `ak project` (handles projects outside the git root)
 3. If neither is available, ask the user
 
 When working in a sub-project (e.g. `agent-kit/` inside `archie/`), the sub-project's
@@ -80,12 +80,12 @@ Examples:
    discoverable questions: existing patterns, conventions, dependencies, relevant modules.
    Use `action-analyze-codebase` for unfamiliar repos.
    Also check project documentation (README, CONTRIBUTING, AGENTS.md) and use
-   `tool-project-config` to resolve the project config. If an issue tracker is
-   configured (`issues.provider`), note it for use after plan approval. If no
+   `ak project --config` to resolve the project config. If an issue tracker is
+   configured (`brain.issues.provider`), note it for use after plan approval. If no
    tracker is configured, skip issue tracking silently.
 
    If multiple sources indicate different trackers, prefer: the user's explicit instruction,
-   then project config (`tool-project-config`), then project documentation.
+   then project config (`ak project --config`), then project documentation.
 
 4. **Resolve the Decision Tree** — systematically walk through each branch of the design space.
    For each open question:
@@ -194,7 +194,7 @@ See [references/MILESTONES.md](references/MILESTONES.md) for detailed rules and 
 **Approval Gate:** "Here is the complete plan. Shall we move to Implementation Mode?"
 
 5. **Persist the plan:**
-   - **With tracker:** if an issue tracker was identified via `tool-project-config`,
+   - **With tracker:** if an issue tracker was identified via `ak project --config`,
      use `tool-issues` to create or update the issue with the full plan as the issue
      description. If an existing issue was referenced, update its description. If no
      existing issue, create one with the plan title.

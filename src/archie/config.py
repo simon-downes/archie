@@ -12,7 +12,6 @@ import yaml
 ARCHIE_HOME = Path.home() / ".archie"
 CONFIG_PATH = ARCHIE_HOME / "config.yaml"
 PERSONA_PATH = ARCHIE_HOME / "persona"
-PROJECTS_PATH = ARCHIE_HOME / "projects.yaml"
 
 # macOS stores kiro data in ~/Library/Application Support/kiro-cli
 # Linux stores it in ~/.local/share/kiro-cli (XDG default)
@@ -23,70 +22,35 @@ _KIRO_DATA_DIR = (
 )
 
 DEFAULT_CONFIG = {
-    "project_dir": "~/dev",
     "theme": "blue",
     "env": {
         "TERM": "$TERM",
         "COLORTERM": "$COLORTERM",
         "EDITOR": "$EDITOR",
     },
-    "tools": {
-        "kiro": {
-            "command": "kiro-cli",
-            "args": ["chat", "--agent", "archie"],
-        },
-        "toad": {
-            "command": "toad",
-        },
-    },
-    "auth": {
-        "github": {
-            "type": "static",
-            "fields": ["token"],
-        },
-        "notion": {
-            "type": "oauth",
-        },
-        "aws": {
-            "type": "static",
-            "fields": ["access_key_id", "secret_access_key", "session_token"],
-        },
-        "scalr": {
-            "type": "static",
-            "fields": ["token", "hostname"],
-        },
-        "linear": {
-            "type": "static",
-            "fields": ["token"],
-        },
-        "slack": {
-            "type": "static",
-            "fields": ["webhook_url"],
-        },
-    },
     "credentials": {
-        "GH_TOKEN": "github.token",
-        "NOTION_TOKEN": "notion.access_token",
-        "AWS_ACCESS_KEY_ID": "aws.access_key_id",
-        "AWS_SECRET_ACCESS_KEY": "aws.secret_access_key",
-        "AWS_SESSION_TOKEN": "aws.session_token",
-        "SCALR_TOKEN": "scalr.token",
-        "SCALR_HOSTNAME": "scalr.hostname",
-        "LINEAR_TOKEN": "linear.token",
-        "SLACK_WEBHOOK_URL": "slack.webhook_url",
+        "GH_TOKEN": "ak.github.token",
+        "NOTION_TOKEN": "ak.notion.access_token",
+        "AWS_ACCESS_KEY_ID": "ak.aws.access_key_id",
+        "AWS_SECRET_ACCESS_KEY": "ak.aws.secret_access_key",
+        "AWS_SESSION_TOKEN": "ak.aws.session_token",
+        "SCALR_TOKEN": "ak.scalr.token",
+        "SCALR_HOSTNAME": "ak.scalr.hostname",
+        "LINEAR_TOKEN": "ak.linear.token",
+        "SLACK_WEBHOOK_URL": "ak.slack.webhook_url",
     },
     "mounts": [
         ["~/.archie/persona/agents", "~/.kiro/agents"],
         ["~/.archie/persona/skills", "~/.kiro/skills"],
         ["~/.archie/persona/prompts", "~/.kiro/prompts"],
         ["~/.archie/persona/guidance", "~/.kiro/steering"],
+        ["~/.agent-kit", "~/.agent-kit:ro"],
         [_KIRO_DATA_DIR, "~/.local/share/kiro-cli"],
         "~/.toad",
         ["~/.archie/aws.config", "~/.aws/config:ro"],
         "~/.gitconfig:ro",
         ["~/.ssh/id_ed25519", "~/.ssh/id_ed25519:ro"],
         ["~/.ssh/id_ed25519.pub", "~/.ssh/id_ed25519.pub:ro"],
-        ["~/.archie/projects.yaml", "~/.archie/projects.yaml:ro"],
     ],
 }
 
@@ -139,10 +103,6 @@ def install() -> None:
     if not CONFIG_PATH.exists():
         _write_config(DEFAULT_CONFIG)
 
-    # Create projects config if missing
-    if not PROJECTS_PATH.exists():
-        _write_starter_projects()
-
 
 def load_config() -> dict:
     """Load config from ~/.archie/config.yaml."""
@@ -174,7 +134,10 @@ def check_status() -> StatusCheck:
         status.docker_running = result.returncode == 0
 
     # Project dir exists?
-    project_dir = Path(config.get("project_dir", "~/dev")).expanduser().resolve()
+    from archie.docker import _read_ak_config
+
+    ak_config = _read_ak_config()
+    project_dir = Path(ak_config.get("project_dir", "~/dev")).expanduser().resolve()
     status.project_dir = str(project_dir)
     status.project_dir_exists = project_dir.exists()
 
@@ -201,19 +164,17 @@ def check_status() -> StatusCheck:
     # Credential issues?
     from datetime import datetime
 
-    from archie.auth import get_field
+    from archie.auth.inject import _load_ak_credentials
 
-    for service, svc_config in config.get("auth", {}).items():
-        svc_type = svc_config.get("type", "static")
-        if svc_type == "oauth":
-            expires_at = get_field(service, "expires_at")
-            if expires_at:
-                try:
-                    expiry = datetime.fromisoformat(expires_at)
-                    if datetime.now(expiry.tzinfo) > expiry:
-                        status.credential_issues.append(f"{service}: expired")
-                except (ValueError, TypeError):
-                    pass
+    ak_creds = _load_ak_credentials()
+    for service, fields in ak_creds.items():
+        if isinstance(fields, dict) and "expires_at" in fields:
+            try:
+                expiry = datetime.fromisoformat(str(fields["expires_at"]))
+                if datetime.now(expiry.tzinfo) > expiry:
+                    status.credential_issues.append(f"{service}: expired")
+            except (ValueError, TypeError):
+                pass
 
     return status
 
@@ -305,12 +266,15 @@ def resolve_project() -> Path:
 
     The project is the first subdirectory under project_dir that is an
     ancestor of (or equal to) the current working directory.
+    Reads project_dir from agent-kit config (~/.agent-kit/config.yaml).
 
     Raises:
         SystemExit: If cwd is not under project_dir.
     """
-    config = load_config()
-    project_dir = Path(config.get("project_dir", "~/dev")).expanduser().resolve()
+    from archie.docker import _read_ak_config
+
+    ak_config = _read_ak_config()
+    project_dir = Path(ak_config.get("project_dir", "~/dev")).expanduser().resolve()
     cwd = Path.cwd().resolve()
 
     try:
@@ -352,41 +316,3 @@ def _write_config(config: dict) -> None:
     InlineListDumper.add_representer(list, represent_list)
 
     CONFIG_PATH.write_text(yaml.dump(config, Dumper=InlineListDumper, sort_keys=False))
-
-
-_STARTER_PROJECTS = """\
-# Project configuration — maps git orgs/repos to providers and settings.
-# Archie resolves the current project from the git remote origin and merges
-# org defaults with any project-level overrides.
-
-orgs: {}
-  # <org-name>:
-  #
-  #   # Source control provider
-  #   # Values: github, bitbucket
-  #   source:
-  #     provider: github
-  #
-  #   # Issue tracker
-  #   # Values: linear, github
-  #   issues:
-  #     provider: linear
-  #     team: PLAT              # default team key for this org
-  #
-  #   # Slack notifications (posts on PR creation)
-  #   # Set to the env var name that holds the webhook URL
-  #   slack:
-  #     webhook_env: SLACK_WEBHOOK_URL
-
-# Per-project overrides — keys here are merged on top of the org config.
-# Format: <org-name>/<project-name>
-projects: {}
-  # <org-name>/<project-name>:
-  #   issues:
-  #     team: INFRA             # override the org default team
-"""
-
-
-def _write_starter_projects() -> None:
-    """Write a commented starter projects.yaml."""
-    PROJECTS_PATH.write_text(_STARTER_PROJECTS)

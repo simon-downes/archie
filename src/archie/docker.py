@@ -72,24 +72,53 @@ def _target_arch() -> str:
     return {"x86_64": "amd64", "aarch64": "arm64", "arm64": "arm64"}.get(machine, "amd64")
 
 
-def build_image(context_path: Path, *, no_cache: bool = False) -> None:
+def build_image(context_path: Path, *, quick: bool = False) -> None:
     """Build the sandbox Docker image."""
-    import time
-
     args = ["build"]
-    if no_cache:
+    if not quick:
         args.append("--no-cache")
-    args.extend([
-        "--build-arg", f"TARGETARCH={_target_arch()}",
-        "--build-arg", f"USERNAME={HOST_USERNAME}",
-        "--build-arg", f"USER_UID={HOST_UID}",
-        "--build-arg", f"CACHEBUST_AK={int(time.time())}",
-        "-t", IMAGE_NAME,
-        str(context_path),
-    ])
+    args.extend(
+        [
+            "--build-arg",
+            f"TARGETARCH={_target_arch()}",
+            "--build-arg",
+            f"USERNAME={HOST_USERNAME}",
+            "--build-arg",
+            f"USER_UID={HOST_UID}",
+            "-t",
+            IMAGE_NAME,
+            str(context_path),
+        ]
+    )
     result = _docker(*args)
     if result.returncode != 0:
         raise RuntimeError(f"Build failed with exit code {result.returncode}")
+
+
+_AK_CONFIG_PATH = Path.home() / ".agent-kit" / "config.yaml"
+_DEFAULT_BRAIN_DIR = Path.home() / ".archie" / "brain"
+
+
+def _read_ak_config() -> dict:
+    """Read agent-kit config, returning empty dict if missing."""
+    if _AK_CONFIG_PATH.exists():
+        try:
+            import yaml
+
+            with _AK_CONFIG_PATH.open() as f:
+                return yaml.safe_load(f) or {}
+        except Exception:
+            pass
+    return {}
+
+
+def _resolve_brain_dir() -> Path:
+    """Read brain dir from agent-kit config, fall back to default."""
+    brain = _read_ak_config().get("brain", {})
+    brain_dir = brain.get("dir") if isinstance(brain, dict) else None
+    if brain_dir:
+        return Path(brain_dir).expanduser()
+    return _DEFAULT_BRAIN_DIR
 
 
 def run_container(command: list[str], tool_name: str = "shell") -> int:
@@ -135,10 +164,17 @@ def run_container(command: list[str], tool_name: str = "shell") -> int:
         container_project,
     ]
 
+    # Mount brain if it exists — read from agent-kit config, default ~/.archie/brain
+    brain_dir = _resolve_brain_dir()
+    if brain_dir and brain_dir.exists():
+        container_brain = str(brain_dir).replace(host_home, container_home)
+        ro = ":ro" if project.name != "archie" else ""
+        args.extend(["-v", f"{brain_dir}:{container_brain}{ro}"])
+
     if sys.stdin.isatty():
         args.append("-it")
 
-    for name, value in {**env, **creds, "ARCHIE_PROJECT_ROOT": container_project}.items():
+    for name, value in {**env, **creds}.items():
         args.extend(["-e", f"{name}={value}"])
 
     for host_path, container_mount in mounts:
