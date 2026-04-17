@@ -144,12 +144,9 @@ provider reference files.
 
 ## Dispatch
 
-1. Use `tool-project-config` to resolve the current project's config
-2. Read `source.provider` from the config
-3. Load `references/provider-<name>.md` for the matching provider
-4. If no config or no source provider is set, check the git remote URL to infer the
-   provider (e.g. `github.com` → github)
-5. If the provider cannot be determined, warn and skip provider-specific operations
+1. Infer the source provider from the git remote URL (e.g. `github.com` → github)
+2. Load `references/provider-<name>.md` for the matching provider
+3. If the provider cannot be determined, warn and skip provider-specific operations
 
 ## Available Providers
 

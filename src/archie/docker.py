@@ -99,19 +99,25 @@ _AK_CONFIG_PATH = Path.home() / ".agent-kit" / "config.yaml"
 _DEFAULT_BRAIN_DIR = Path.home() / ".archie" / "brain"
 
 
-def _resolve_brain_dir() -> Path:
-    """Read brain_dir from agent-kit config, fall back to default."""
+def _read_ak_config() -> dict:
+    """Read agent-kit config, returning empty dict if missing."""
     if _AK_CONFIG_PATH.exists():
         try:
             import yaml
 
             with _AK_CONFIG_PATH.open() as f:
-                ak_config = yaml.safe_load(f) or {}
-            brain_dir = ak_config.get("brain_dir")
-            if brain_dir:
-                return Path(brain_dir).expanduser()
+                return yaml.safe_load(f) or {}
         except Exception:
             pass
+    return {}
+
+
+def _resolve_brain_dir() -> Path:
+    """Read brain dir from agent-kit config, fall back to default."""
+    brain = _read_ak_config().get("brain", {})
+    brain_dir = brain.get("dir") if isinstance(brain, dict) else None
+    if brain_dir:
+        return Path(brain_dir).expanduser()
     return _DEFAULT_BRAIN_DIR
 
 
@@ -168,7 +174,7 @@ def run_container(command: list[str], tool_name: str = "shell") -> int:
     if sys.stdin.isatty():
         args.append("-it")
 
-    for name, value in {**env, **creds, "ARCHIE_PROJECT_ROOT": container_project}.items():
+    for name, value in {**env, **creds}.items():
         args.extend(["-e", f"{name}={value}"])
 
     for host_path, container_mount in mounts:

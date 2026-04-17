@@ -12,7 +12,6 @@ import yaml
 ARCHIE_HOME = Path.home() / ".archie"
 CONFIG_PATH = ARCHIE_HOME / "config.yaml"
 PERSONA_PATH = ARCHIE_HOME / "persona"
-PROJECTS_PATH = ARCHIE_HOME / "projects.yaml"
 
 # macOS stores kiro data in ~/Library/Application Support/kiro-cli
 # Linux stores it in ~/.local/share/kiro-cli (XDG default)
@@ -23,7 +22,6 @@ _KIRO_DATA_DIR = (
 )
 
 DEFAULT_CONFIG = {
-    "project_dir": "~/dev",
     "theme": "blue",
     "env": {
         "TERM": "$TERM",
@@ -53,7 +51,6 @@ DEFAULT_CONFIG = {
         "~/.gitconfig:ro",
         ["~/.ssh/id_ed25519", "~/.ssh/id_ed25519:ro"],
         ["~/.ssh/id_ed25519.pub", "~/.ssh/id_ed25519.pub:ro"],
-        ["~/.archie/projects.yaml", "~/.archie/projects.yaml:ro"],
     ],
 }
 
@@ -106,10 +103,6 @@ def install() -> None:
     if not CONFIG_PATH.exists():
         _write_config(DEFAULT_CONFIG)
 
-    # Create projects config if missing
-    if not PROJECTS_PATH.exists():
-        _write_starter_projects()
-
 
 def load_config() -> dict:
     """Load config from ~/.archie/config.yaml."""
@@ -141,7 +134,10 @@ def check_status() -> StatusCheck:
         status.docker_running = result.returncode == 0
 
     # Project dir exists?
-    project_dir = Path(config.get("project_dir", "~/dev")).expanduser().resolve()
+    from archie.docker import _read_ak_config
+
+    ak_config = _read_ak_config()
+    project_dir = Path(ak_config.get("project_dir", "~/dev")).expanduser().resolve()
     status.project_dir = str(project_dir)
     status.project_dir_exists = project_dir.exists()
 
@@ -270,12 +266,15 @@ def resolve_project() -> Path:
 
     The project is the first subdirectory under project_dir that is an
     ancestor of (or equal to) the current working directory.
+    Reads project_dir from agent-kit config (~/.agent-kit/config.yaml).
 
     Raises:
         SystemExit: If cwd is not under project_dir.
     """
-    config = load_config()
-    project_dir = Path(config.get("project_dir", "~/dev")).expanduser().resolve()
+    from archie.docker import _read_ak_config
+
+    ak_config = _read_ak_config()
+    project_dir = Path(ak_config.get("project_dir", "~/dev")).expanduser().resolve()
     cwd = Path.cwd().resolve()
 
     try:
@@ -317,41 +316,3 @@ def _write_config(config: dict) -> None:
     InlineListDumper.add_representer(list, represent_list)
 
     CONFIG_PATH.write_text(yaml.dump(config, Dumper=InlineListDumper, sort_keys=False))
-
-
-_STARTER_PROJECTS = """\
-# Project configuration — maps git orgs/repos to providers and settings.
-# Archie resolves the current project from the git remote origin and merges
-# org defaults with any project-level overrides.
-
-orgs: {}
-  # <org-name>:
-  #
-  #   # Source control provider
-  #   # Values: github, bitbucket
-  #   source:
-  #     provider: github
-  #
-  #   # Issue tracker
-  #   # Values: linear, github
-  #   issues:
-  #     provider: linear
-  #     team: PLAT              # default team key for this org
-  #
-  #   # Slack notifications (posts on PR creation)
-  #   # Set to the env var name that holds the webhook URL
-  #   slack:
-  #     webhook_env: SLACK_WEBHOOK_URL
-
-# Per-project overrides — keys here are merged on top of the org config.
-# Format: <org-name>/<project-name>
-projects: {}
-  # <org-name>/<project-name>:
-  #   issues:
-  #     team: INFRA             # override the org default team
-"""
-
-
-def _write_starter_projects() -> None:
-    """Write a commented starter projects.yaml."""
-    PROJECTS_PATH.write_text(_STARTER_PROJECTS)

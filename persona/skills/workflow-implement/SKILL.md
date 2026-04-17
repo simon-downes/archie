@@ -56,7 +56,7 @@ If the plan came from an issue tracker:
 If the plan is a local file, create a branch: `<user>/<plan-number>-<description>`
 (e.g. `simon/001-rate-limiting`).
 
-Use `tool-project-config` to resolve the project config, then use `tool-issues` for
+Use `ak project --config` to resolve the project config, then use `tool-issues` for
 issue operations. If no issue tracker is configured, skip issue operations silently.
 
 ### A. Understand the Context

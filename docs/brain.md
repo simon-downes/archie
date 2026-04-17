@@ -7,20 +7,20 @@ composed of context directories, each a separate git repository.
 
 ```
 ~/.archie/brain/
+├── _raw/            # processing pipeline (inbox → processing → completed)
 ├── shared/          # cross-cutting: identity, shared contacts, general knowledge
 ├── work-acme/       # company-specific: projects, team, knowledge, goals
 ├── personal/        # personal: projects, interests, goals
 └── ...              # arbitrary additional contexts
 ```
 
-Each context is an independent git repo. This enables:
-- Different storage locations (company org, personal org)
+Each context is an independent git repo stored in your personal GitHub org. This enables:
 - Different availability per device (clone only what you need)
 - Independent version history
 - Clear confidentiality boundaries
 
-`archie install` creates the `shared/` context with the standard entity directories. Additional
-contexts are created manually as needed.
+Setup and management is via agent-kit: `ak brain init` creates the brain structure and
+initialises contexts. See [agent-kit brain docs](../agent-kit/docs/brain.md) for CLI reference.
 
 ## Entity Types
 
@@ -36,7 +36,6 @@ Each context directory contains whichever of these subdirectories are relevant:
 | `inbox/`      | Actionable items awaiting review                 | Markdown                        |
 | `outbox/`     | Draft messages awaiting manual send              | Markdown                        |
 | `journal/`    | Daily/weekly logs                                | Markdown with YAML frontmatter  |
-| `raw/`        | Unprocessed inputs (gitignored)                  | Any format                      |
 | `archive/`    | Retired entities                                 | Same as source                  |
 
 ## Storage Conventions
@@ -137,15 +136,20 @@ read-only.
 Raw Input (Notion, Google Drive, transcripts, articles, conversations)
     │
     ▼
+_raw/inbox/ — content dropped here for processing
+    │
+    ▼
 Life OS Session — ingestion pipeline
     │
+    ├── Move item to _raw/processing/
     ├── Extract structured data + summary
     ├── Check brain index for existing entities
     ├── LLM decides: create new entity or update existing
     ├── Flag conflicts to inbox (new data contradicts existing)
     ├── Update brain entities + index
     ├── Record provenance in SQLite
-    └── Auto-commit to git
+    ├── Auto-commit to git
+    └── Move item to _raw/completed/
     │
     ▼
 Brain (readable by all sessions)
@@ -169,6 +173,7 @@ Human-in-the-loop checkpoints:
 ## Git Conventions
 
 - Auto-commit after each ingestion run with descriptive messages
-- `raw/` and `brain.db` are gitignored
+- `brain.db` is gitignored per context
+- `_raw/` sits outside context repos — no git concerns
 - `git revert` is the rollback mechanism for bad ingestions
 - Each context is committed independently (separate repos)
