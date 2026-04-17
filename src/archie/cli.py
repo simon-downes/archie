@@ -239,6 +239,23 @@ def status(as_json: bool) -> None:
         *[(m["exists"], m["path"], "missing" if not m["exists"] else "") for m in mounts_data]
     )
 
+    from archie.docker import _resolve_brain_dir
+
+    brain_dir = _resolve_brain_dir()
+    section("Brain")
+    if brain_dir.exists():
+        contexts = sorted(
+            d.name for d in brain_dir.iterdir() if d.is_dir() and not d.name.startswith(".")
+        )
+        status_table(
+            (True, "Directory", str(brain_dir)),
+            *[(True, ctx, "") for ctx in contexts]
+            if contexts
+            else [(False, "No contexts", "run 'ak brain create-context shared'")],
+        )
+    else:
+        status_table((False, "Directory", f"{brain_dir} (not found)"))
+
     if containers:
         section("Sessions")
         data_table(

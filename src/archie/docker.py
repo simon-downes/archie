@@ -95,6 +95,26 @@ def build_image(context_path: Path, *, quick: bool = False) -> None:
         raise RuntimeError(f"Build failed with exit code {result.returncode}")
 
 
+_AK_CONFIG_PATH = Path.home() / ".agent-kit" / "config.yaml"
+_DEFAULT_BRAIN_DIR = Path.home() / ".archie" / "brain"
+
+
+def _resolve_brain_dir() -> Path:
+    """Read brain_dir from agent-kit config, fall back to default."""
+    if _AK_CONFIG_PATH.exists():
+        try:
+            import yaml
+
+            with _AK_CONFIG_PATH.open() as f:
+                ak_config = yaml.safe_load(f) or {}
+            brain_dir = ak_config.get("brain_dir")
+            if brain_dir:
+                return Path(brain_dir).expanduser()
+        except Exception:
+            pass
+    return _DEFAULT_BRAIN_DIR
+
+
 def run_container(command: list[str], tool_name: str = "shell") -> int:
     """Run a command in the sandbox container.
 
@@ -138,6 +158,13 @@ def run_container(command: list[str], tool_name: str = "shell") -> int:
         container_project,
     ]
 
+    # Mount brain if it exists — read from agent-kit config, default ~/.archie/brain
+    brain_dir = _resolve_brain_dir()
+    if brain_dir and brain_dir.exists():
+        container_brain = str(brain_dir).replace(host_home, container_home)
+        ro = ":ro" if project.name != "archie" else ""
+        args.extend(["-v", f"{brain_dir}:{container_brain}{ro}"])
+
     if sys.stdin.isatty():
         args.append("-it")
 
@@ -145,9 +172,6 @@ def run_container(command: list[str], tool_name: str = "shell") -> int:
         args.extend(["-e", f"{name}={value}"])
 
     for host_path, container_mount in mounts:
-        # Brain is read-write when running from the archie project (life OS session)
-        if project.name == "archie" and container_mount.endswith("/brain:ro"):
-            container_mount = container_mount.removesuffix(":ro")
         args.extend(["-v", f"{host_path}:{container_mount}"])
 
     args.extend([IMAGE_NAME, *command])
