@@ -25,6 +25,10 @@ brain/
 │   ├── inbox/               # Items to process
 │   ├── processing/          # Currently being processed
 │   └── completed/           # Done
+├── _memory/                 # Conversation memory (device-local, no git)
+│   ├── 2026-04-18-archie.md
+│   ├── 2026-04-14-tillo-platform.md
+│   └── 2026-04-18-c951.md  # General session
 ├── shared/                  # Personal/general context (git repo)
 │   ├── me/                  # Identity, preferences
 │   ├── contacts/            # People

@@ -83,21 +83,19 @@ can be rebuilt (with loss of ingestion history).
 
 ## Memory
 
-Archie's session memory is built on the brain. Kiro-cli persists conversation history
-in a SQLite database (`~/.local/share/kiro-cli/data.sqlite3`). The `action-brain-memory`
-skill reads conversation transcripts since the last run, extracts decisions, knowledge,
-and progress, and writes updates to the brain.
+Conversation memory lives in `_memory/` at the brain root — a device-local directory
+outside any context's git repo, alongside `_raw/`.
 
-Memory extraction is run manually (triggered by the user). It processes all conversations
-updated since the last watermark across all projects. The watermark is stored in
-`shared/brain.db` to track what's been processed.
+Files are named `<date>-<identifier>.md`: project sessions use the project name
+(`2026-04-18-archie.md`), general sessions use a conversation ID prefix
+(`2026-04-18-c951.md`). One file per day per project; one file per general session.
 
-Extracted information is written as knowledge entities using the standard
-`action-brain-write` patterns. Context routing uses the conversation's working directory
-to map to a project and brain context.
+Each file contains turn-by-turn summaries grouped under topic headings, with prefixes
+(Discussed, Decided, Action, Correction) to make scanning easy.
 
-This closes the learning loop: work happens → conversation captured → memory extraction
-processes it → brain updated → next session has that context.
+The `action-brain-memory` skill processes conversations: a prep script extracts clean
+turn pairs from kiro-cli's SQLite database, then the LLM summarises them into memory
+files. Watermark tracking ensures conversations are only processed once.
 
 ## Inbox and Outbox
 

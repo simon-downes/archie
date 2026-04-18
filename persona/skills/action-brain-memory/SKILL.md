@@ -33,12 +33,17 @@ did we decide about X?"
 
 ## File Location
 
-- **Project sessions:** `<context>/projects/<project>/memory/<date>.md`
-  One file per day per project (only one session active at a time).
-- **General sessions:** `shared/memory/<date>-<id>.md`
-  One file per conversation, using first 4 chars of conversation_id as suffix.
+All memory files live in `~/.archie/brain/_memory/` — a top-level directory
+alongside `_raw/`, outside any context's git repo. Device-local, not portable.
 
-Create the `memory/` directory if it doesn't exist.
+**Naming:** `<date>-<identifier>.md`
+- Project sessions: `2026-04-18-archie.md`, `2026-04-14-tillo-platform.md`
+- General sessions: `2026-04-18-c951.md` (first 4 chars of conversation_id)
+
+One file per day per project. Multiple sessions on the same project in one day
+append to the same file. General sessions are always one file per conversation.
+
+Create the `_memory/` directory if it doesn't exist.
 
 ## File Structure
 
@@ -86,8 +91,8 @@ can change when files are reorganised.
 
 ## Conventions
 
-**Headings** (`#` / `##`) break the conversation into topic sections. A long
-conversation may have several topics; a short one may have just one.
+**Headings** break the conversation into topic sections. A long conversation may
+have several topics; a short one may have just one.
 
 **Turn summaries** are short paragraphs — one to three sentences each. Each
 paragraph captures the essence of one exchange or a few closely related exchanges.
@@ -98,11 +103,7 @@ paragraph captures the essence of one exchange or a few closely related exchange
 - **Action** — implemented something, made a change, completed work
 - **Correction** — user pushed back, fixed a mistake, redirected approach
 
-Not every paragraph needs a prefix — use them when they add clarity. A natural
-prose summary is fine when the type is obvious from context.
-
-**Multiple sessions same day (project):** if a project file for that date already
-exists, append the new session's content as additional topic sections.
+Not every paragraph needs a prefix — use them when they add clarity.
 
 ---
 
@@ -118,7 +119,6 @@ Check what's available:
 ```bash
 cat /tmp/memory-payload.json | python3 -c "
 import json, sys
-from collections import Counter
 data = json.load(sys.stdin)
 print(f'{len(data[\"conversations\"])} conversations')
 for c in data['conversations']:
@@ -138,32 +138,32 @@ For each conversation, read the turns and produce the memory file content.
 - Greetings, acknowledgments, small talk
 
 **Preserve progression:** the summary should read top-to-bottom as a narrative
-of what happened. Someone reading it should understand the arc of the conversation
-without needing the full transcript.
+of what happened. Someone reading it should understand the arc of the conversation.
 
 **Group related turns** under topic headings. Don't create a heading per turn —
 group exchanges about the same topic together.
 
 ## 3. Write files
 
-Resolve the target location per conversation:
-- Has a project name → `ak brain project <name>` to find context → write to
-  `<context>/projects/<project>/memory/<date>.md`
-- No project (general session) → write to `shared/memory/<date>-<id>.md`
-  where `<id>` is the first 4 characters of the conversation_id
+Write to `~/.archie/brain/_memory/`:
+- Project conversation → `<date>-<project>.md`
+- General conversation → `<date>-<first 4 chars of conversation_id>.md`
 
-## 4. Commit
+If a project file for that date already exists, append the new session's content
+as additional topic sections.
 
-```bash
-ak brain commit <context> -m "brain: memory <date>" --paths <memory-file-paths>
-```
+No git commit needed — `_memory/` is outside context repos.
 
-## 5. Update watermark
+## 4. Update watermark
 
 ```bash
 python3 ~/.kiro/skills/action-brain-memory/scripts/memory-prep.py \
   --set-watermark <watermark_from_payload>
 ```
+
+## 5. Report
+
+Summarise: number of sessions processed, dates covered, files written.
 
 ---
 
