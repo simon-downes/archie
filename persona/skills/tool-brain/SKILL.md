@@ -65,14 +65,25 @@ ak brain reindex shared
 ak brain reindex tillo
 ```
 
-### `ak brain commit <context> -m <message>`
+### `ak brain commit <context> -m <message> [--paths <file> ...]`
 
-Stage all changes and commit in a context.
+Stage and commit changes in a context. Use `--paths` to stage specific files only
+(repeatable). Without `--paths`, stages all changes (`git add -A`).
+
+Prefer `--paths` when multiple agents may write to the same context concurrently —
+prevents one agent's commit from sweeping up another agent's uncommitted files.
 
 ```bash
-ak brain commit shared -m "brain: add aurora knowledge"
-ak brain commit tillo -m "brain: ingest meeting notes 2026-04-18"
+# Commit specific files (preferred for concurrent safety)
+ak brain commit shared -m "brain: add aurora knowledge" \
+  --paths knowledge/aurora-failover.md --paths index.yaml
+
+# Commit all changes (single-agent use)
+ak brain commit shared -m "brain: bulk update"
 ```
+
+Both `reindex` and `commit` acquire a per-context file lock internally, so concurrent
+calls from different agents will queue rather than interleave.
 
 ### `ak brain status [context]`
 

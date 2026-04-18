@@ -140,11 +140,14 @@ the context (e.g. `["knowledge/aurora-failover.md", "contacts/jane-smith.yaml"]`
 
 ## 8. Commit
 
-One commit per affected context:
+One commit per affected context, specifying the files you wrote:
 
 ```bash
-ak brain commit <context> -m "brain: ingest <raw-item-filename>"
+ak brain commit <context> -m "brain: ingest <raw-item-filename>" \
+  --paths <file1> --paths <file2> --paths index.yaml
 ```
+
+Include all entity files created/updated plus `index.yaml`.
 
 ## 9. Complete
 

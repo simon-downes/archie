@@ -130,11 +130,15 @@ File: `<context>/inbox/routing-<slug>-<date>.md`
 
 ## 6. Commit
 
-Commit all changes to the context in a single commit:
+Commit all changes to the context, specifying the files you wrote:
 
 ```bash
-ak brain commit <context> -m "brain: <brief description>"
+ak brain commit <context> -m "brain: <brief description>" \
+  --paths <file1> --paths <file2> --paths index.yaml
 ```
+
+Always include `index.yaml` in the paths if you ran `reindex`. Only commit files
+you created or modified — this prevents sweeping up another agent's uncommitted work.
 
 If writes span multiple contexts, commit each independently.
 

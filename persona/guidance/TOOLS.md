@@ -160,8 +160,12 @@ ak brain index shared --slug aurora-failover
 # Rebuild index from filesystem
 ak brain reindex shared
 
+# Stage and commit specific files (preferred)
+ak brain commit shared -m "brain: add aurora knowledge" \
+  --paths knowledge/aurora-failover.md --paths index.yaml
+
 # Stage and commit all changes
-ak brain commit shared -m "brain: add aurora knowledge"
+ak brain commit shared -m "brain: bulk update"
 
 # Show status (raw pipeline + git changes)
 ak brain status
