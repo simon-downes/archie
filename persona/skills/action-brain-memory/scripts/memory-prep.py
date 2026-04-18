@@ -17,7 +17,6 @@ Output (JSON to stdout):
         "conversations": [
             {
                 "project": "archie",
-                "context": "shared",
                 "conversation_id": "abc-123",
                 "updated_at": 1713434567000,
                 "transcript": "full transcript text..."
@@ -26,6 +25,9 @@ Output (JSON to stdout):
         ],
         "watermark": 1713434567000
     }
+
+project is the project name derived from the working directory, or empty string
+for general (non-project) sessions.
 """
 
 import json
@@ -34,8 +36,7 @@ import sys
 from pathlib import Path
 
 KIRO_DB = Path.home() / ".local" / "share" / "kiro-cli" / "data.sqlite3"
-BRAIN_DIR = Path.home() / ".archie" / "brain"
-BRAIN_DB = BRAIN_DIR / "shared" / "brain.db"
+BRAIN_DB = Path.home() / ".archie" / "brain" / "shared" / "brain.db"
 AK_CONFIG = Path.home() / ".agent-kit" / "config.yaml"
 
 
@@ -82,32 +83,22 @@ def set_watermark(ts: int) -> None:
     conn.close()
 
 
-def resolve_project(key: str) -> str | None:
+def resolve_project(key: str) -> str:
     """Extract project name from a conversation key (working directory path).
 
     Uses the basename of project_dir (from agent-kit config) to find the project
     root in any path, handling cross-platform differences (macOS /Users vs Linux /home).
+    Returns empty string if the key doesn't match a project directory.
     """
     dir_name = _project_dir_name()
     marker = f"/{dir_name}/"
     idx = key.find(marker)
     if idx == -1:
-        return None
+        return ""
     remainder = key[idx + len(marker) :]
     if not remainder:
-        return None
+        return ""
     return remainder.split("/")[0]
-
-
-def resolve_context(project: str) -> str:
-    """Map a project name to a brain context. Falls back to 'shared'."""
-    for ctx_dir in sorted(BRAIN_DIR.iterdir()):
-        if not ctx_dir.is_dir() or ctx_dir.name.startswith(("_", ".")):
-            continue
-        project_dir = ctx_dir / "projects" / project
-        if project_dir.exists():
-            return ctx_dir.name
-    return "shared"
 
 
 def main() -> None:
@@ -156,8 +147,6 @@ def main() -> None:
 
     for key, conversation_id, value, updated_at in rows:
         project = resolve_project(key)
-        if not project:
-            continue
         if project_filter and project != project_filter:
             continue
 
@@ -174,10 +163,8 @@ def main() -> None:
         if len(transcript.strip()) < 100:
             continue
 
-        context = resolve_context(project)
         conversations.append({
             "project": project,
-            "context": context,
             "conversation_id": conversation_id,
             "updated_at": updated_at,
             "transcript": transcript,

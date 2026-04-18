@@ -62,9 +62,14 @@ import json, sys
 data = json.load(sys.stdin)
 print(f'{len(data[\"conversations\"])} conversations')
 for c in data['conversations']:
-    print(f'  {c[\"project\"]:20s} ctx={c[\"context\"]:8s} {len(c[\"transcript\"]):>6} chars')
+    p = c['project'] or '(general)'
+    print(f'  {p:20s} {len(c[\"transcript\"]):>6} chars')
 "
 ```
+
+The `project` field is the project name from the working directory, or empty string
+for general (non-project) sessions. Context routing is determined by the agent during
+extraction, not by the script.
 
 If no conversations found, stop.
 
@@ -78,21 +83,16 @@ subagent. The subagent receives:
 - The project name
 - Instructions to extract and write to the brain
 
-**Batching:** maximum 4 subagents run concurrently. If more than 4 conversations,
-group them — either by context (all conversations for the same context in one
-subagent) or in batches of 4.
-
-**Grouping by context is preferred** — it reduces the number of reindex/commit
-operations and lets the subagent deduplicate across conversations for the same
-project.
+**Batching:** maximum 4 subagents run concurrently. Group conversations into
+batches — by project if there are many, or simply by count. Each subagent can
+handle multiple transcripts and write to multiple contexts as needed.
 
 ### Subagent prompt template
 
 ```
 Process these conversation transcripts and extract valuable information to the brain.
 
-Target context: {context}
-Project: {project}
+Project: {project} (empty = general session)
 
 For each transcript, extract:
 - **Decisions** — choices made with rationale
@@ -101,20 +101,21 @@ For each transcript, extract:
 
 Skip: routine tool use, debugging steps, code (it's in git), small talk.
 
-Write each extracted item to the brain following these rules:
-1. Check the brain index for existing entities: `ak brain index {context} --type knowledge`
-2. If an existing entity covers the same topic, update it — don't create a duplicate
-3. New entities go to `{context}/knowledge/<slug>.md` with frontmatter:
+Write each extracted item to the brain following the `action-brain-write` pattern:
+1. Determine the correct brain context for each item — use `ak brain index` to check
+   where related entities already exist. The project name is a hint but not a hard rule;
+   any conversation can produce writes to any context.
+2. Check the brain index for existing entities on the same topic
+3. If an existing entity covers the same topic, update it — don't create a duplicate
+4. New entities go to `<context>/knowledge/<slug>.md` with frontmatter:
    ```
-   ---
    tags: [relevant, tags]
    summary: One-line description
    source: conversation
-   ---
    ```
-4. After all writes: `ak brain reindex {context}`
-5. Commit with explicit paths:
-   `ak brain commit {context} -m "brain: memory extraction" --paths <files> --paths index.yaml`
+5. After all writes per context: `ak brain reindex <context>`
+6. Commit with explicit paths:
+   `ak brain commit <context> -m "brain: memory extraction" --paths <files> --paths index.yaml`
 
 Transcripts:
 
@@ -158,16 +159,18 @@ a large volume. Options:
 ```bash
 # 1. Gather
 python3 ~/.kiro/skills/action-brain-memory/scripts/memory-prep.py > /tmp/memory-payload.json
-# Output: 12 conversations, 3 for tillo (ctx=tillo), 9 for others (ctx=shared)
+# Output: 12 conversations — 3 for tillo-platform, 7 for archie, 2 general
 
-# 2. Process — spawn 2 subagents (one per context)
-# Subagent 1: tillo context, 3 transcripts
-# Subagent 2: shared context, 9 transcripts
+# 2. Process — spawn subagents with batches of transcripts
+# Subagent 1: tillo-platform conversations (3 transcripts)
+# Subagent 2: archie conversations (7 transcripts)
+# Subagent 3: general conversations (2 transcripts)
+# Each subagent determines context routing per extracted item
 
 # 3. Update watermark
 python3 ~/.kiro/skills/action-brain-memory/scripts/memory-prep.py --set-watermark 1713434567000
 
 # 4. Report
-# tillo: 2 knowledge entities created, 1 updated
-# shared: 5 knowledge entities created, 3 updated
+# 5 knowledge entities created across shared and tillo contexts
+# 3 existing entities updated
 ```
