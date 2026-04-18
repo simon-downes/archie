@@ -94,8 +94,14 @@ can change when files are reorganised.
 **Headings** break the conversation into topic sections. A long conversation may
 have several topics; a short one may have just one.
 
-**Turn summaries** are short paragraphs — one to three sentences each. Each
-paragraph captures the essence of one exchange or a few closely related exchanges.
+**Turn summaries** are short paragraphs — one to three sentences each. Produce
+one summary per turn (user input + assistant response pair). Closely related
+turns on the same micro-topic can be combined, but don't collapse an entire
+topic into a single bullet.
+
+Capture the **progression** — who raised what, who pushed back, how the approach
+evolved. "Initially planned X, user pushed back on complexity, landed on Y" is
+much more useful than just "Decided Y."
 
 **Prefixes** indicate the nature of each entry:
 - **Discussed** — explored a topic, considered options, analysed tradeoffs
@@ -104,6 +110,10 @@ paragraph captures the essence of one exchange or a few closely related exchange
 - **Correction** — user pushed back, fixed a mistake, redirected approach
 
 Not every paragraph needs a prefix — use them when they add clarity.
+
+**End with current status** — if work is in progress, note where things stand:
+what's done, what's next, what's blocked. This is the most useful part for
+picking up work in a future session.
 
 ---
 
