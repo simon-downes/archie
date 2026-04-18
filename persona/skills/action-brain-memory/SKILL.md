@@ -98,6 +98,11 @@ For each transcript, extract:
 - **Decisions** — choices made with rationale
 - **Knowledge** — facts, patterns, technical information
 - **Progress** — significant work completed, changes made
+- **Corrections** — moments where the user pushed back, corrected a mistake,
+  or redirected the approach. Capture what went wrong and what the correct
+  behaviour should have been. Examples: incorrect assumptions, jumping to
+  implementation without discussion, overcomplicating a solution, hardcoding
+  values, misunderstanding intent.
 
 Skip: routine tool use, debugging steps, code (it's in git), small talk.
 
@@ -116,6 +121,17 @@ Write each extracted item to the brain following the `action-brain-write` patter
 5. After all writes per context: `ak brain reindex <context>`
 6. Commit with explicit paths:
    `ak brain commit <context> -m "brain: memory extraction" --paths <files> --paths index.yaml`
+
+Corrections go to `shared/knowledge/archie-corrections.md` — a single accumulating
+file of behavioural patterns to improve. Append new entries, don't overwrite existing
+ones. Format each entry as:
+
+```markdown
+## <date> — <short description>
+**Mistake:** <what happened>
+**Correction:** <what the correct behaviour should be>
+**Pattern:** <the general lesson, if applicable>
+```
 
 Transcripts:
 
