@@ -232,6 +232,28 @@ CREATE TABLE IF NOT EXISTS provenance (
 );
 ```
 
+## Memory Watermark Schema
+
+Tracks the last conversation memory extraction. Stored in `shared/brain.db`.
+
+```sql
+CREATE TABLE IF NOT EXISTS memory_watermark (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    last_processed_at INTEGER NOT NULL  -- conversations_v2.updated_at value
+);
+```
+
+## Conversation Data Source
+
+Kiro-cli stores conversation history in:
+
+```
+~/.local/share/kiro-cli/data.sqlite3
+```
+
+Table `conversations_v2`: `key` (working directory), `conversation_id` (UUID),
+`value` (JSON with `transcript` array), `updated_at` (Unix ms timestamp).
+
 One `brain.db` per context, gitignored. Created on first use via `sqlite3`.
 
 ## Commit Conventions

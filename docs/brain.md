@@ -84,11 +84,19 @@ can be rebuilt (with loss of ingestion history).
 ## Memory
 
 Archie's session memory is built on the brain. Kiro-cli persists conversation history
-in a SQLite database. A memory ingestion pipeline reads conversations since the last
-ingestion, extracts notable decisions, context, and learnings, and writes updates to
-the brain (journal entries, project context, knowledge, inbox items).
+in a SQLite database (`~/.local/share/kiro-cli/data.sqlite3`). The `action-brain-memory`
+skill reads conversation transcripts since the last run, extracts decisions, knowledge,
+and progress, and writes updates to the brain.
 
-This closes the learning loop: work happens → conversation captured → memory ingestion
+Memory extraction is run manually (triggered by the user). It processes all conversations
+updated since the last watermark across all projects. The watermark is stored in
+`shared/brain.db` to track what's been processed.
+
+Extracted information is written as knowledge entities using the standard
+`action-brain-write` patterns. Context routing uses the conversation's working directory
+to map to a project and brain context.
+
+This closes the learning loop: work happens → conversation captured → memory extraction
 processes it → brain updated → next session has that context.
 
 ## Inbox and Outbox
@@ -122,6 +130,7 @@ Brain operations are driven by four skills:
 | `action-brain-read` | Action | Query brain via index lookup + grep fallback |
 | `action-brain-write` | Action | Write with dedup, routing, index update, commit |
 | `action-brain-ingest` | Action | Full ingestion pipeline from `_raw/inbox/` |
+| `action-brain-memory` | Action | Extract decisions and knowledge from conversation history |
 
 ## Knowledge Structure
 
