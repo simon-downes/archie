@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Prepare conversation transcripts for memory summarisation.
 
-Reads kiro-cli conversation history, parses transcripts into clean turn pairs
-(user input + assistant response), strips tool-use noise, and outputs structured
-data ready for LLM summarisation.
+Reads kiro-cli conversation history from both storage formats:
+- SQLite (older): ~/.local/share/kiro-cli/data.sqlite3
+- File-based (newer): ~/.kiro/sessions/cli/<id>.json + <id>.jsonl
+
+Parses transcripts into clean turn pairs (user input + assistant response),
+strips tool-use noise, and outputs structured data ready for LLM summarisation.
 
 Usage:
     python3 memory-prep.py [--since TIMESTAMP] [--project NAME] [--set-watermark TIMESTAMP]
@@ -42,11 +45,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 KIRO_DB = Path.home() / ".local" / "share" / "kiro-cli" / "data.sqlite3"
+SESSIONS_DIR = Path.home() / ".kiro" / "sessions" / "cli"
 BRAIN_DB = Path.home() / ".archie" / "brain" / "shared" / "brain.db"
 AK_CONFIG = Path.home() / ".agent-kit" / "config.yaml"
-
-# Lines matching these prefixes are stripped from assistant responses
-TOOL_NOISE = ("[Tool uses:", "[Tool use:", "[Subagent")
 
 
 def _project_dir_name() -> str:
@@ -92,6 +93,26 @@ def set_watermark(ts: int) -> None:
     conn.close()
 
 
+def _iso_to_ms(iso_str: str) -> int:
+    """Convert ISO 8601 timestamp to unix milliseconds."""
+    # Handle nanosecond precision by truncating to microseconds
+    if "." in iso_str:
+        base, frac = iso_str.split(".")
+        # Split off timezone suffix
+        tz_suffix = ""
+        for tz in ("Z", "+", "-"):
+            if tz in frac:
+                idx = frac.index(tz)
+                tz_suffix = frac[idx:]
+                frac = frac[:idx]
+                break
+        frac = frac[:6]  # truncate to microseconds
+        iso_str = f"{base}.{frac}{tz_suffix}"
+    iso_str = iso_str.replace("Z", "+00:00")
+    dt = datetime.fromisoformat(iso_str)
+    return int(dt.timestamp() * 1000)
+
+
 def resolve_project(key: str) -> str:
     """Extract project name from a conversation key (working directory path)."""
     dir_name = _project_dir_name()
@@ -105,7 +126,10 @@ def resolve_project(key: str) -> str:
     return remainder.split("/")[0]
 
 
-def parse_turns(transcript: list) -> list[dict]:
+# --- SQLite format (older) ---
+
+
+def _parse_transcript_turns(transcript: list) -> list[dict]:
     """Parse transcript items into user/assistant turn pairs.
 
     User messages start with '>'. Consecutive non-user items are the assistant
@@ -113,7 +137,7 @@ def parse_turns(transcript: list) -> list[dict]:
     """
     turns = []
     current_user = None
-    current_asst = []
+    current_asst: list[str] = []
 
     for item in transcript:
         s = str(item).strip()
@@ -126,17 +150,7 @@ def parse_turns(transcript: list) -> list[dict]:
             current_user = s.lstrip("> ").strip()
             current_asst = []
         else:
-            if any(s.startswith(prefix) for prefix in TOOL_NOISE):
-                continue
-            # Strip inline tool-use markers
-            cleaned = s
-            for prefix in TOOL_NOISE:
-                while prefix in cleaned:
-                    start = cleaned.index(prefix)
-                    end = cleaned.find("]", start)
-                    if end == -1:
-                        break
-                    cleaned = (cleaned[:start] + cleaned[end + 1 :]).strip()
+            cleaned = _strip_tool_noise(s)
             if cleaned:
                 current_asst.append(cleaned)
 
@@ -146,10 +160,177 @@ def parse_turns(transcript: list) -> list[dict]:
     return turns
 
 
+def load_sqlite_conversations(since: int) -> list[dict]:
+    """Load conversations from the SQLite database."""
+    if not KIRO_DB.exists():
+        return []
+
+    conn = sqlite3.connect(KIRO_DB)
+    rows = conn.execute(
+        "SELECT key, conversation_id, value, updated_at "
+        "FROM conversations_v2 WHERE updated_at > ? ORDER BY updated_at ASC",
+        (since,),
+    ).fetchall()
+    conn.close()
+
+    conversations = []
+    for key, conversation_id, value, updated_at in rows:
+        try:
+            data = json.loads(value)
+        except json.JSONDecodeError:
+            continue
+
+        transcript = data.get("transcript", [])
+        if not transcript:
+            continue
+
+        turns = _parse_transcript_turns(transcript)
+        if not turns:
+            continue
+
+        conversations.append({
+            "project": resolve_project(key),
+            "date": datetime.fromtimestamp(updated_at / 1000, tz=timezone.utc).strftime("%Y-%m-%d"),
+            "conversation_id": conversation_id,
+            "updated_at": updated_at,
+            "turns": turns,
+        })
+
+    return conversations
+
+
+# --- File-based format (newer) ---
+
+
+def _parse_jsonl_turns(jsonl_path: Path) -> list[dict]:
+    """Parse a .jsonl session file into user/assistant turn pairs."""
+    turns = []
+    current_user = None
+    current_asst: list[str] = []
+
+    with jsonl_path.open() as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            kind = entry.get("kind")
+            data = entry.get("data", {})
+
+            if kind == "Prompt":
+                if current_user is not None:
+                    turns.append(_make_turn(current_user, current_asst))
+                current_user = _extract_text(data)
+                current_asst = []
+
+            elif kind == "AssistantMessage":
+                text = _extract_text(data)
+                if text:
+                    cleaned = _strip_tool_noise(text)
+                    if cleaned:
+                        current_asst.append(cleaned)
+
+    if current_user is not None:
+        turns.append(_make_turn(current_user, current_asst))
+
+    return turns
+
+
+def _extract_text(data: dict) -> str:
+    """Extract text content from a Prompt or AssistantMessage data dict."""
+    content = data.get("content", [])
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict) and item.get("kind") == "text":
+                parts.append(item.get("data", ""))
+        return "\n".join(parts).strip()
+    if isinstance(content, str):
+        return content.strip()
+    # Fallback for simple prompt format
+    prompt = data.get("prompt", "")
+    if isinstance(prompt, str):
+        return prompt.strip()
+    return ""
+
+
+def load_file_conversations(since: int) -> list[dict]:
+    """Load conversations from the file-based session store."""
+    if not SESSIONS_DIR.exists():
+        return []
+
+    conversations = []
+    for json_path in sorted(SESSIONS_DIR.glob("*.json")):
+        jsonl_path = json_path.with_suffix(".jsonl")
+        if not jsonl_path.exists():
+            continue
+
+        try:
+            meta = json.loads(json_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        updated_at_str = meta.get("updated_at", "")
+        if not updated_at_str:
+            continue
+
+        updated_at = _iso_to_ms(updated_at_str)
+        if updated_at <= since:
+            continue
+
+        cwd = meta.get("cwd", "")
+        session_id = meta.get("session_id", json_path.stem)
+
+        # Skip subagent sessions (no agent_name set)
+        agent_name = (meta.get("session_state") or {}).get("agent_name")
+        if not agent_name:
+            continue
+
+        turns = _parse_jsonl_turns(jsonl_path)
+        if not turns:
+            continue
+
+        conversations.append({
+            "project": resolve_project(cwd),
+            "date": updated_at_str[:10],
+            "conversation_id": session_id,
+            "updated_at": updated_at,
+            "turns": turns,
+        })
+
+    return conversations
+
+
+# --- Shared helpers ---
+
+
+def _strip_tool_noise(s: str) -> str:
+    """Remove tool-use markers from a string."""
+    noise_prefixes = ("[Tool uses:", "[Tool use:", "[Subagent")
+    if any(s.startswith(p) for p in noise_prefixes):
+        return ""
+    cleaned = s
+    for prefix in noise_prefixes:
+        while prefix in cleaned:
+            start = cleaned.index(prefix)
+            end = cleaned.find("]", start)
+            if end == -1:
+                break
+            cleaned = (cleaned[:start] + cleaned[end + 1 :]).strip()
+    return cleaned
+
+
 def _make_turn(user: str, asst_parts: list[str]) -> dict:
     """Create a turn dict from user text and assistant response parts."""
     asst = "\n\n".join(p for p in asst_parts if p.strip())
     return {"user": user, "assistant": asst}
+
+
+# --- Main ---
 
 
 def main() -> None:
@@ -179,49 +360,17 @@ def main() -> None:
     if since is None:
         since = get_watermark()
 
-    if not KIRO_DB.exists():
-        print(json.dumps({"conversations": [], "watermark": since}))
-        return
+    # Load from both sources
+    conversations = load_sqlite_conversations(since) + load_file_conversations(since)
 
-    conn = sqlite3.connect(KIRO_DB)
-    rows = conn.execute(
-        "SELECT key, conversation_id, value, updated_at "
-        "FROM conversations_v2 WHERE updated_at > ? ORDER BY updated_at ASC",
-        (since,),
-    ).fetchall()
-    conn.close()
+    # Filter by project if requested
+    if project_filter:
+        conversations = [c for c in conversations if c["project"] == project_filter]
 
-    conversations = []
-    max_watermark = since
+    # Sort by updated_at
+    conversations.sort(key=lambda c: c["updated_at"])
 
-    for key, conversation_id, value, updated_at in rows:
-        project = resolve_project(key)
-        if project_filter and project != project_filter:
-            continue
-
-        try:
-            data = json.loads(value)
-        except json.JSONDecodeError:
-            continue
-
-        transcript = data.get("transcript", [])
-        if not transcript:
-            continue
-
-        turns = parse_turns(transcript)
-        if not turns:
-            continue
-
-        date = datetime.fromtimestamp(updated_at / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
-
-        conversations.append({
-            "project": project,
-            "date": date,
-            "conversation_id": conversation_id,
-            "updated_at": updated_at,
-            "turns": turns,
-        })
-        max_watermark = max(max_watermark, updated_at)
+    max_watermark = max((c["updated_at"] for c in conversations), default=since)
 
     print(
         json.dumps({"conversations": conversations, "watermark": max_watermark}, indent=2),
