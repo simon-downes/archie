@@ -1,18 +1,18 @@
 ---
 name: action-brain-memory
 description: >
-  Summarise recent conversations into structured daily memory files in the brain.
+  Summarise recent conversations into structured memory files in the brain.
   Uses a prep script to extract clean turn pairs from kiro-cli history, then
-  summarises into categorised daily logs. Use when asked to "process conversations",
-  "update memory", "summarise recent sessions", "what did we discuss", or
-  "catch up on recent work".
+  produces turn-by-turn summaries grouped by topic. Use when asked to "process
+  conversations", "update memory", "summarise recent sessions", "what did we
+  discuss", or "catch up on recent work".
 ---
 
 # Purpose
 
-Produce structured daily summaries of conversations so future sessions can quickly
-answer: "what have we discussed recently?", "what did we do this week?", "what did
-we decide about X?"
+Produce structured summaries of conversations so future sessions can quickly
+answer: "what have we discussed recently?", "what did we do this week?", "what
+did we decide about X?"
 
 ---
 
@@ -31,43 +31,78 @@ we decide about X?"
 
 # Output Format
 
-Memory files live at `<context>/projects/<project>/memory/<date>.md` for project
-sessions, or `shared/memory/<date>.md` for general sessions.
+## File Location
 
-Multiple sessions on the same day are appended to the same file as separate sections.
+- **Project sessions:** `<context>/projects/<project>/memory/<date>.md`
+  One file per day per project (only one session active at a time).
+- **General sessions:** `shared/memory/<date>-<id>.md`
+  One file per conversation, using first 4 chars of conversation_id as suffix.
+
+Create the `memory/` directory if it doesn't exist.
+
+## File Structure
 
 ```markdown
-# 2026-04-18
+---
+date: 2026-04-18
+project: archie
+---
 
-## Session: brain read/write capability
+# Brain Read/Write Capability
 
-### Decisions
-- Content-based context routing for brain writes, not source tagging
-- Single commit per context per operation, not per entity
-- Explicit path staging (--paths) for concurrent agent safety
+Discussed how to query the brain — two-step pattern: index lookup first, grep
+fallback. Index is the entry point for known entities, rg for broad searches
+across content.
 
-### Changes
-- Added brain read/write skills (tool-brain, action-brain-read, action-brain-write)
-- Added ak brain reindex and commit commands to agent-kit
-- Added per-context flock locking to reindex_context()
+Discussed how to prevent duplicate entities when writing. Index is the dedup
+mechanism — check before creating. Reindex rebuilds from filesystem state so
+is self-healing.
 
-### Discussions
-- How to handle concurrent brain writes from multiple agents
-- Knowledge directory structure — flat by default, subdirectories at 5+ files
+Decided context routing should be content-based, not source-tagged. Raw items
+dropped in _raw/inbox should be zero-friction — no tagging required. The LLM
+analyses content and matches against existing brain indexes to determine context.
 
-### Feedback
-- Correction: hardcoded ~/dev path, should use project_dir from config
-- Correction: prescribed context routing in script, should leave to agent
+# Concurrent Brain Access
+
+Discussed risks of multiple agents writing to the same context simultaneously.
+Main concerns: git add -A sweeping up other agents' files, and two reindexes
+clobbering index.yaml.
+
+Decided to add flock locking to reindex_context() — invisible to the LLM,
+prevents index corruption.
+
+Action: changed commit_context() to accept explicit --paths instead of git
+add -A. Each agent commits only the files it wrote.
+
+Correction: initially hardcoded ~/dev in memory-prep.py. Should use project_dir
+from agent-kit config.
+
+# Knowledge Directory Structure
+
+Discussed how to organise knowledge/. Start flat, introduce subdirectories only
+when 5+ related files cluster. Slugs are stable identifiers in the index — paths
+can change when files are reorganised.
 ```
 
-### Categories
+## Conventions
 
-- **Decisions** — choices made with rationale. The "we decided X because Y" moments.
-- **Changes** — significant work completed, refactors, new features. What actually changed.
-- **Discussions** — topics explored but not necessarily resolved. Context for future sessions.
-- **Feedback** — corrections, pushback, praise. What went well or poorly.
+**Headings** (`#` / `##`) break the conversation into topic sections. A long
+conversation may have several topics; a short one may have just one.
 
-Not every session will have entries in every category. Omit empty categories.
+**Turn summaries** are short paragraphs — one to three sentences each. Each
+paragraph captures the essence of one exchange or a few closely related exchanges.
+
+**Prefixes** indicate the nature of each entry:
+- **Discussed** — explored a topic, considered options, analysed tradeoffs
+- **Decided** — made a choice with rationale
+- **Action** — implemented something, made a change, completed work
+- **Correction** — user pushed back, fixed a mistake, redirected approach
+
+Not every paragraph needs a prefix — use them when they add clarity. A natural
+prose summary is fine when the type is obvious from context.
+
+**Multiple sessions same day (project):** if a project file for that date already
+exists, append the new session's content as additional topic sections.
 
 ---
 
@@ -75,14 +110,9 @@ Not every session will have entries in every category. Omit empty categories.
 
 ## 1. Gather conversations
 
-Run the prep script to get clean turn pairs:
-
 ```bash
 python3 ~/.kiro/skills/action-brain-memory/scripts/memory-prep.py > /tmp/memory-payload.json
 ```
-
-The script outputs conversations with parsed turns (user input + assistant response),
-tool-use noise stripped, grouped by project and date.
 
 Check what's available:
 ```bash
@@ -91,59 +121,42 @@ import json, sys
 from collections import Counter
 data = json.load(sys.stdin)
 print(f'{len(data[\"conversations\"])} conversations')
-projects = Counter()
 for c in data['conversations']:
     p = c['project'] or '(general)'
-    projects[p] += 1
-for p, n in sorted(projects.items(), key=lambda x: -x[1]):
-    print(f'  {p}: {n}')
+    print(f'  {c[\"date\"]} {p:20s} {len(c[\"turns\"]):>3} turns')
 "
 ```
 
-If no conversations found, stop.
+## 2. Summarise
 
-## 2. Summarise conversations
-
-For each conversation in the payload:
-
-1. Read the turns
-2. Determine a short session title from the overall topic
-3. Categorise the content into Decisions, Changes, Discussions, Feedback
-4. Write concise bullet points — not full transcripts, not single words
+For each conversation, read the turns and produce the memory file content.
 
 **Be selective:** not every turn is worth capturing. Skip:
-- Routine tool use and file operations
+- Routine file reads and tool operations
 - Debugging steps and intermediate attempts
-- Questions fully answered in the same conversation
-- Small talk, greetings, acknowledgments
-- Implementation details (the code is in git)
+- Questions fully answered in the same exchange
+- Greetings, acknowledgments, small talk
 
-**Focus on:** what would help someone (including future-you) understand what happened
-in this session without reading the full conversation.
+**Preserve progression:** the summary should read top-to-bottom as a narrative
+of what happened. Someone reading it should understand the arc of the conversation
+without needing the full transcript.
 
-## 3. Write memory files
+**Group related turns** under topic headings. Don't create a heading per turn —
+group exchanges about the same topic together.
 
-Resolve the target location:
-- If the conversation has a project name, look it up: `ak brain project <name>`
-  - If found, write to `<context>/projects/<project>/memory/<date>.md`
-  - If not found, write to `shared/memory/<date>.md`
-- If no project (general session), write to `shared/memory/<date>.md`
+## 3. Write files
 
-Create the `memory/` directory if it doesn't exist.
-
-If the file already exists (multiple sessions on the same day), append the new
-session as a new `## Session:` section.
+Resolve the target location per conversation:
+- Has a project name → `ak brain project <name>` to find context → write to
+  `<context>/projects/<project>/memory/<date>.md`
+- No project (general session) → write to `shared/memory/<date>-<id>.md`
+  where `<id>` is the first 4 characters of the conversation_id
 
 ## 4. Commit
 
-Commit with explicit paths per context:
-
 ```bash
-ak brain commit <context> -m "brain: memory <date>" \
-  --paths <memory-file-paths>
+ak brain commit <context> -m "brain: memory <date>" --paths <memory-file-paths>
 ```
-
-No reindex needed — memory files aren't indexed entities.
 
 ## 5. Update watermark
 
@@ -152,40 +165,12 @@ python3 ~/.kiro/skills/action-brain-memory/scripts/memory-prep.py \
   --set-watermark <watermark_from_payload>
 ```
 
-## 6. Report
-
-Summarise: number of sessions processed, dates covered, projects touched.
-
 ---
 
 # Batching
 
-For many conversations, delegate to subagents. Group by project — one subagent
-per project (or per batch of projects). Each subagent receives the turns and
-writes the memory files.
+For many conversations, delegate to subagents grouped by project. Each subagent
+receives the turns for its conversations and writes the memory files.
 
-Maximum 4 subagents concurrently. The orchestrating agent handles the watermark
-update after all subagents complete.
-
----
-
-# Example
-
-```bash
-# 1. Gather
-python3 ~/.kiro/skills/action-brain-memory/scripts/memory-prep.py > /tmp/memory-payload.json
-# Found 5 conversations: 3 archie, 2 tillo-platform
-
-# 2-3. Summarise and write
-# archie conversations → shared/projects/archie/memory/2026-04-18.md
-# tillo conversations → tillo/projects/tillo-platform/memory/2026-04-18.md
-
-# 4. Commit
-ak brain commit shared -m "brain: memory 2026-04-18" \
-  --paths projects/archie/memory/2026-04-18.md
-ak brain commit tillo -m "brain: memory 2026-04-18" \
-  --paths projects/tillo-platform/memory/2026-04-18.md
-
-# 5. Update watermark
-python3 .../memory-prep.py --set-watermark 1713434567000
-```
+Maximum 4 subagents concurrently. The orchestrating agent updates the watermark
+after all subagents complete.
