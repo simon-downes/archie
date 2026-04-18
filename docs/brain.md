@@ -61,7 +61,13 @@ Brain (readable by all sessions)
 ```
 
 The LLM decides entity placement within a context, guided by the brain index and
-ingestion skills. The only hard routing is which context the input belongs to.
+ingestion skills. Context routing is content-based — the LLM analyses the content,
+matches entities against existing brain indexes, and routes to the context with the
+most matches. No source tagging is required. `shared` is the default when no context
+scores.
+
+When routing confidence is low, the LLM routes to its best guess and creates an
+inbox note flagging the decision for review.
 
 Conflicts — where new data contradicts existing brain content — are flagged to the
 context's inbox rather than silently overwriting.
@@ -98,7 +104,28 @@ Human-in-the-loop checkpoints:
 ## Git Conventions
 
 - Auto-commit after each ingestion run with descriptive messages
+- Ingestion commits: `brain: ingest <source-filename>`
+- Manual write commits: `brain: <brief description>`
 - `brain.db` is gitignored per context
 - `_raw/` sits outside context repos — no git concerns
 - `git revert` is the rollback mechanism for bad ingestions
 - Each context is committed independently (separate repos)
+- One commit per context per operation (not per entity)
+
+## Skills
+
+Brain operations are driven by four skills:
+
+| Skill | Layer | Purpose |
+|-------|-------|---------|
+| `tool-brain` | Tool | CLI commands, file formats, shell tool patterns |
+| `action-brain-read` | Action | Query brain via index lookup + grep fallback |
+| `action-brain-write` | Action | Write with dedup, routing, index update, commit |
+| `action-brain-ingest` | Action | Full ingestion pipeline from `_raw/inbox/` |
+
+## Knowledge Structure
+
+Knowledge files live in `<context>/knowledge/` as markdown with YAML frontmatter
+(`tags`, `summary`). Start flat — introduce subdirectories only when a clear cluster
+of 5+ related files emerges. Slugs are the stable identifier in the index; paths can
+change when files are reorganised.
