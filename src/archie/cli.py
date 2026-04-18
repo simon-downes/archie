@@ -95,23 +95,13 @@ def _print_not_ready(s) -> None:
         print_error(f"[{C_KEY}]Docker[/] is not installed")
     elif not s.docker_running:
         print_error(f"[{C_KEY}]Docker[/] is not running")
-    elif not s.project_dir_exists:
-        print_error(f"Project directory not found: [{C_VAL}]{s.project_dir}[/]")
 
 
-def _print_not_ready(s) -> None:
-    if not s.docker_installed:
-        print_error(f"[{C_KEY}]Docker[/] is not installed")
-    elif not s.docker_running:
-        print_error(f"[{C_KEY}]Docker[/] is not running")
-    elif not s.project_dir_exists:
-        print_error(f"Project directory not found: [{C_VAL}]{s.project_dir}[/]")
-
-
-@click.group(invoke_without_command=True)
+@click.group(invoke_without_command=True, cls=ArchieCLI)
 @click.option("--plain", is_flag=True, help="Disable colours and formatting")
+@click.option("--session", default=None, help="Name for a general session")
 @click.pass_context
-def main(ctx: click.Context, plain: bool) -> None:
+def main(ctx: click.Context, plain: bool, session: str | None) -> None:
     """Archie — personal AI platform."""
     if plain:
         from archie.output import console, console_err
@@ -127,7 +117,7 @@ def main(ctx: click.Context, plain: bool) -> None:
         if not s.ready:
             _print_not_ready(s)
             sys.exit(1)
-        sys.exit(run_container(["kiro-cli", "chat", "--agent", "archie"]))
+        sys.exit(run_container(["kiro-cli", "chat", "--agent", "archie"], session=session))
 
 
 @main.command(name="install")

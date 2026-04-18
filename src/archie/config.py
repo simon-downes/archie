@@ -70,7 +70,7 @@ class StatusCheck:
     @property
     def ready(self) -> bool:
         """True if environment is ready to run containers."""
-        return self.docker_installed and self.docker_running and self.project_dir_exists
+        return self.docker_installed and self.docker_running
 
 
 def is_installed() -> bool:
@@ -261,15 +261,14 @@ def resolve_mounts(config: dict) -> list[tuple[str, str]]:
     return mounts
 
 
-def resolve_project() -> Path:
+def resolve_project() -> Path | None:
     """Discover the project directory from cwd.
 
     The project is the first subdirectory under project_dir that is an
     ancestor of (or equal to) the current working directory.
     Reads project_dir from agent-kit config (~/.agent-kit/config.yaml).
 
-    Raises:
-        SystemExit: If cwd is not under project_dir.
+    Returns None if cwd is not inside a project (at project_dir root or outside it).
     """
     from archie.docker import _read_ak_config
 
@@ -280,12 +279,11 @@ def resolve_project() -> Path:
     try:
         relative = cwd.relative_to(project_dir)
     except ValueError:
-        from archie.output import print_error
+        return None
 
-        print_error(f"Not inside project directory ({project_dir})")
-        raise SystemExit(1) from None
+    if not relative.parts:
+        return None
 
-    # First component of the relative path is the project
     return project_dir / relative.parts[0]
 
 

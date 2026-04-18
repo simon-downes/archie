@@ -121,12 +121,13 @@ def _resolve_brain_dir() -> Path:
     return _DEFAULT_BRAIN_DIR
 
 
-def run_container(command: list[str], tool_name: str = "shell") -> int:
+def run_container(command: list[str], tool_name: str = "shell", session: str | None = None) -> int:
     """Run a command in the sandbox container.
 
     Args:
         command: Command and arguments to run in the container.
         tool_name: Used for container naming (archie-<tool>-<project>).
+        session: Optional session name for general sessions.
     """
     from archie.auth.inject import resolve_credentials
     from archie.config import load_config, resolve_env, resolve_mounts, resolve_project
@@ -139,36 +140,52 @@ def run_container(command: list[str], tool_name: str = "shell") -> int:
 
     host_home = str(Path.home())
     container_home = f"/home/{HOST_USERNAME}"
-    container_project = str(project).replace(host_home, container_home)
-    container_name = f"{CONTAINER_PREFIX}{_sanitize_name(tool_name)}-{_sanitize_name(project.name)}"
 
-    # Check for existing session
-    if _docker_output("ps", "-q", "--filter", f"name=^/{container_name}$"):
-        from archie.output import print_error
+    if project:
+        # Project session
+        container_project = str(project).replace(host_home, container_home)
+        container_name = (
+            f"{CONTAINER_PREFIX}{_sanitize_name(tool_name)}-{_sanitize_name(project.name)}"
+        )
+    else:
+        # General session
+        if session:
+            suffix = _sanitize_name(session)
+        else:
+            import hashlib
+            import time
 
-        print_error(f"Session [bright_blue]{container_name}[/bright_blue] already running")
-        return 1
+            suffix = hashlib.sha1(str(time.time_ns()).encode()).hexdigest()[:5]
+        container_name = f"{CONTAINER_PREFIX}general-{suffix}"
+
+    # Check for existing session (general sessions with hash are always unique)
+    if session or project:
+        if _docker_output("ps", "-q", "--filter", f"name=^/{container_name}$"):
+            from archie.output import print_error
+
+            print_error(f"Session [bright_blue]{container_name}[/bright_blue] already running")
+            return 1
 
     from archie.output import display_header
 
-    display_header(tool_name, project.name, container_name)
+    display_header(tool_name, project.name if project else "general", container_name)
 
     args = [
         "run",
         "--rm",
         "--name",
         container_name,
-        "-v",
-        f"{project}:{container_project}",
-        "-w",
-        container_project,
     ]
 
-    # Mount brain if it exists — read from agent-kit config, default ~/.archie/brain
+    if project:
+        args.extend(["-v", f"{project}:{container_project}", "-w", container_project])
+
+    # Mount brain if it exists
     brain_dir = _resolve_brain_dir()
     if brain_dir and brain_dir.exists():
         container_brain = str(brain_dir).replace(host_home, container_home)
-        ro = ":ro" if project.name != "archie" else ""
+        # Read-write for general sessions and archie project, read-only for other projects
+        ro = ":ro" if project and project.name != "archie" else ""
         args.extend(["-v", f"{brain_dir}:{container_brain}{ro}"])
 
     if sys.stdin.isatty():
