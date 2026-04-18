@@ -185,14 +185,36 @@ Summarise what was extracted:
 
 ---
 
-# First Run
+# First Run / Initial Import
 
-On first run, the watermark is 0 so all conversations are returned. This may be
-a large volume. Options:
+On first run, the watermark is 0 so all conversations are returned. This is a
+one-time bulk import that needs special handling.
 
-- Process everything (may take a while but captures full history)
-- Use `--since` to limit to recent conversations
-- Use `--project` to process one project at a time
+**Volume:** use `--project` to process one project at a time, or batch by project
+name from the payload.
+
+**Precursor projects:** some projects may be predecessors of current ones (e.g.
+early prototypes that evolved into the current codebase). When spawning subagents,
+tell them which projects are precursors and what they became:
+
+> "The following projects are precursors to archie and should be treated as
+> archie context: ai-config, agent-workspace, ax, cli-tools, agent-executor"
+
+**Anchor against current state:** before extracting from historical conversations,
+read the current project documentation (README, CONTRIBUTING, docs/) and provide
+it to the subagent as context. The agent should only extract information that is
+still relevant to the current state. Anything that contradicts current docs or
+code is dead history — skip it.
+
+**Be highly selective:** the initial import will contain a lot of noise —
+dead-end explorations, reversed decisions, superseded designs. Extract only:
+- Decisions and rationale that are still reflected in the current codebase
+- Knowledge that remains true and useful
+- Feedback patterns that are still relevant
+- Design principles that carried forward
+
+After the initial import, subsequent runs will be incremental and much simpler —
+just new conversations since the last watermark.
 
 ---
 
