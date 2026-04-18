@@ -29,7 +29,6 @@ Output (JSON to stdout):
 """
 
 import json
-import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -37,9 +36,21 @@ from pathlib import Path
 KIRO_DB = Path.home() / ".local" / "share" / "kiro-cli" / "data.sqlite3"
 BRAIN_DIR = Path.home() / ".archie" / "brain"
 BRAIN_DB = BRAIN_DIR / "shared" / "brain.db"
+AK_CONFIG = Path.home() / ".agent-kit" / "config.yaml"
 
-# Matches /Users/<user>/dev/<project> or /home/<user>/dev/<project>
-PROJECT_RE = re.compile(r"^/(?:Users|home)/[^/]+/dev/([^/]+)")
+
+def _project_dir_name() -> str:
+    """Load the basename of project_dir from agent-kit config (e.g. 'dev')."""
+    if AK_CONFIG.exists():
+        try:
+            import yaml
+
+            with AK_CONFIG.open() as f:
+                config = yaml.safe_load(f) or {}
+            return Path(config.get("project_dir", "~/dev")).expanduser().name
+        except Exception:
+            pass
+    return "dev"
 
 
 def get_watermark() -> int:
@@ -72,9 +83,20 @@ def set_watermark(ts: int) -> None:
 
 
 def resolve_project(key: str) -> str | None:
-    """Extract project name from a conversation key (working directory path)."""
-    m = PROJECT_RE.match(key)
-    return m.group(1) if m else None
+    """Extract project name from a conversation key (working directory path).
+
+    Uses the basename of project_dir (from agent-kit config) to find the project
+    root in any path, handling cross-platform differences (macOS /Users vs Linux /home).
+    """
+    dir_name = _project_dir_name()
+    marker = f"/{dir_name}/"
+    idx = key.find(marker)
+    if idx == -1:
+        return None
+    remainder = key[idx + len(marker) :]
+    if not remainder:
+        return None
+    return remainder.split("/")[0]
 
 
 def resolve_context(project: str) -> str:
