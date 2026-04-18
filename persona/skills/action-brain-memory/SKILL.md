@@ -104,7 +104,33 @@ For each transcript, extract:
   jumping to implementation without discussion, overcomplicating a solution,
   implementations that failed, and things that went particularly well.
 
-Skip: routine tool use, debugging steps, code (it's in git), small talk.
+**What to capture:**
+- Decisions with rationale that affect future work
+- Technical knowledge that would be useful in a future session
+- Architectural patterns, conventions, and design principles established
+- Feedback moments (positive, negative, corrections)
+- Significant progress milestones
+
+**What to skip:**
+- Routine tool use and file operations (the code is in git)
+- Debugging steps and intermediate attempts that didn't lead anywhere
+- Code snippets and implementation details (git is the source of truth)
+- Questions that were fully answered in the same conversation
+- Small talk, greetings, acknowledgments
+- Temporary workarounds that were immediately replaced
+- Information that's already documented in project READMEs or docs
+- Exploratory discussion that didn't result in a decision or insight
+
+**Temporal awareness:** conversations are processed oldest-first. Later
+conversations may supersede earlier ones. When extracting:
+- If a decision in an older conversation was reversed in a later one,
+  capture only the final decision (or note the evolution if the reasoning
+  is valuable)
+- Don't capture progress that was later undone or replaced
+- Prefer the most recent understanding of a topic over earlier, potentially
+  outdated information
+- For the initial bulk import of historical conversations, be especially
+  selective — focus on decisions and knowledge that are still relevant today
 
 Write each extracted item to the brain following the `action-brain-write` pattern:
 1. Determine the correct brain context for each item — use `ak brain index` to check
