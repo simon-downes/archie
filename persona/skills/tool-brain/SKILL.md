@@ -82,8 +82,8 @@ ak brain commit shared -m "brain: add aurora knowledge" \
 ak brain commit shared -m "brain: bulk update"
 ```
 
-Both `reindex` and `commit` acquire a per-context file lock internally, so concurrent
-calls from different agents will queue rather than interleave.
+`reindex` acquires a per-context file lock internally, so concurrent reindex calls
+from different agents will queue rather than corrupt `index.yaml`.
 
 ### `ak brain status [context]`
 
