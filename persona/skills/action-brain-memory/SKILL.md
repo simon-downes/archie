@@ -1,25 +1,26 @@
 ---
 name: action-brain-memory
 description: >
-  Extract decisions, knowledge, and progress from recent conversations and write them
-  to the brain. Uses a prep script to gather transcripts and a subagent for extraction.
-  Use when asked to "process conversations", "update memory", "extract from sessions",
-  "what did we discuss", or "catch up on recent work".
+  Summarise recent conversations into structured daily memory files in the brain.
+  Uses a prep script to extract clean turn pairs from kiro-cli history, then
+  summarises into categorised daily logs. Use when asked to "process conversations",
+  "update memory", "summarise recent sessions", "what did we discuss", or
+  "catch up on recent work".
 ---
 
 # Purpose
 
-Close the learning loop: read recent conversation transcripts, extract valuable
-information (decisions, knowledge, progress, significant changes), and write it to
-the brain so future sessions have that context.
+Produce structured daily summaries of conversations so future sessions can quickly
+answer: "what have we discussed recently?", "what did we do this week?", "what did
+we decide about X?"
 
 ---
 
 # When to Use
 
 - Manually triggered to catch up on recent conversations
-- After a series of work sessions to capture what was learned
-- When asked to process or remember recent conversations
+- After a series of work sessions
+- When asked to process or summarise recent conversations
 
 # When Not to Use
 
@@ -28,193 +29,143 @@ the brain so future sessions have that context.
 
 ---
 
+# Output Format
+
+Memory files live at `<context>/projects/<project>/memory/<date>.md` for project
+sessions, or `shared/memory/<date>.md` for general sessions.
+
+Multiple sessions on the same day are appended to the same file as separate sections.
+
+```markdown
+# 2026-04-18
+
+## Session: brain read/write capability
+
+### Decisions
+- Content-based context routing for brain writes, not source tagging
+- Single commit per context per operation, not per entity
+- Explicit path staging (--paths) for concurrent agent safety
+
+### Changes
+- Added brain read/write skills (tool-brain, action-brain-read, action-brain-write)
+- Added ak brain reindex and commit commands to agent-kit
+- Added per-context flock locking to reindex_context()
+
+### Discussions
+- How to handle concurrent brain writes from multiple agents
+- Knowledge directory structure — flat by default, subdirectories at 5+ files
+
+### Feedback
+- Correction: hardcoded ~/dev path, should use project_dir from config
+- Correction: prescribed context routing in script, should leave to agent
+```
+
+### Categories
+
+- **Decisions** — choices made with rationale. The "we decided X because Y" moments.
+- **Changes** — significant work completed, refactors, new features. What actually changed.
+- **Discussions** — topics explored but not necessarily resolved. Context for future sessions.
+- **Feedback** — corrections, pushback, praise. What went well or poorly.
+
+Not every session will have entries in every category. Omit empty categories.
+
+---
+
 # Workflow
 
 ## 1. Gather conversations
 
-Run the prep script to get transcripts ready for processing:
+Run the prep script to get clean turn pairs:
 
 ```bash
 python3 ~/.kiro/skills/action-brain-memory/scripts/memory-prep.py > /tmp/memory-payload.json
 ```
 
-The script:
-- Reads the watermark from `shared/brain.db` (0 if first run)
-- Queries kiro-cli's database for conversations updated since the watermark
-- Extracts transcripts from JSON
-- Normalises project names from paths (handles macOS/Linux differences)
-- Resolves brain context per project
-- Outputs a JSON payload grouped by project
+The script outputs conversations with parsed turns (user input + assistant response),
+tool-use noise stripped, grouped by project and date.
 
-Options:
-```bash
-# Only a specific project
-python3 .../memory-prep.py --project archie > /tmp/memory-payload.json
-
-# Override the watermark (e.g. reprocess last 24h)
-python3 .../memory-prep.py --since <unix_ms_timestamp> > /tmp/memory-payload.json
-```
-
-Check the output:
+Check what's available:
 ```bash
 cat /tmp/memory-payload.json | python3 -c "
 import json, sys
+from collections import Counter
 data = json.load(sys.stdin)
 print(f'{len(data[\"conversations\"])} conversations')
+projects = Counter()
 for c in data['conversations']:
     p = c['project'] or '(general)'
-    print(f'  {p:20s} {len(c[\"transcript\"]):>6} chars')
+    projects[p] += 1
+for p, n in sorted(projects.items(), key=lambda x: -x[1]):
+    print(f'  {p}: {n}')
 "
 ```
 
-The `project` field is the project name from the working directory, or empty string
-for general (non-project) sessions. Context routing is determined by the agent during
-extraction, not by the script.
-
 If no conversations found, stop.
 
-## 2. Process conversations
+## 2. Summarise conversations
 
-For each conversation in the payload, delegate extraction to a `general-purpose`
-subagent. The subagent receives:
+For each conversation in the payload:
 
-- The transcript text
-- The target brain context
-- The project name
-- Instructions to extract and write to the brain
+1. Read the turns
+2. Determine a short session title from the overall topic
+3. Categorise the content into Decisions, Changes, Discussions, Feedback
+4. Write concise bullet points — not full transcripts, not single words
 
-**Batching:** maximum 4 subagents run concurrently. Group conversations into
-batches — by project if there are many, or simply by count. Each subagent can
-handle multiple transcripts and write to multiple contexts as needed.
-
-### Subagent prompt template
-
-```
-Process these conversation transcripts and extract valuable information to the brain.
-
-Project: {project} (empty = general session)
-
-For each transcript, extract:
-- **Decisions** — choices made with rationale
-- **Knowledge** — facts, patterns, technical information
-- **Progress** — significant work completed, changes made
-- **Feedback** — moments where the user pushed back, corrected a mistake,
-  redirected the approach, or praised something that worked well. Capture
-  what happened and what the takeaway is. Includes: incorrect assumptions,
-  jumping to implementation without discussion, overcomplicating a solution,
-  implementations that failed, and things that went particularly well.
-
-**What to capture:**
-- Decisions with rationale that affect future work
-- Technical knowledge that would be useful in a future session
-- Architectural patterns, conventions, and design principles established
-- Feedback moments (positive, negative, corrections)
-- Significant progress milestones
-
-**What to skip:**
-- Routine tool use and file operations (the code is in git)
-- Debugging steps and intermediate attempts that didn't lead anywhere
-- Code snippets and implementation details (git is the source of truth)
-- Questions that were fully answered in the same conversation
+**Be selective:** not every turn is worth capturing. Skip:
+- Routine tool use and file operations
+- Debugging steps and intermediate attempts
+- Questions fully answered in the same conversation
 - Small talk, greetings, acknowledgments
-- Temporary workarounds that were immediately replaced
-- Information that's already documented in project READMEs or docs
-- Exploratory discussion that didn't result in a decision or insight
+- Implementation details (the code is in git)
 
-**Temporal awareness:** conversations are processed oldest-first. Later
-conversations may supersede earlier ones. When extracting:
-- If a decision in an older conversation was reversed in a later one,
-  capture only the final decision (or note the evolution if the reasoning
-  is valuable)
-- Don't capture progress that was later undone or replaced
-- Prefer the most recent understanding of a topic over earlier, potentially
-  outdated information
-- For the initial bulk import of historical conversations, be especially
-  selective — focus on decisions and knowledge that are still relevant today
+**Focus on:** what would help someone (including future-you) understand what happened
+in this session without reading the full conversation.
 
-Write each extracted item to the brain following the `action-brain-write` pattern:
-1. Determine the correct brain context for each item — use `ak brain index` to check
-   where related entities already exist. The project name is a hint but not a hard rule;
-   any conversation can produce writes to any context.
-2. Check the brain index for existing entities on the same topic
-3. If an existing entity covers the same topic, update it — don't create a duplicate
-4. New entities go to `<context>/knowledge/<slug>.md` with frontmatter:
-   ```
-   tags: [relevant, tags]
-   summary: One-line description
-   source: conversation
-   ```
-5. After all writes per context: `ak brain reindex <context>`
-6. Commit with explicit paths:
-   `ak brain commit <context> -m "brain: memory extraction" --paths <files> --paths index.yaml`
+## 3. Write memory files
 
-Corrections go to `shared/knowledge/archie-feedback.md` — a single accumulating
-file of behavioural observations. Append new entries, don't overwrite existing
-ones. Format each entry as:
+Resolve the target location:
+- If the conversation has a project name, look it up: `ak brain project <name>`
+  - If found, write to `<context>/projects/<project>/memory/<date>.md`
+  - If not found, write to `shared/memory/<date>.md`
+- If no project (general session), write to `shared/memory/<date>.md`
 
-```markdown
-## <date> — <short description>
-**What happened:** <description of the event>
-**Takeaway:** <the lesson or reinforcement>
-**Type:** positive | negative | correction
+Create the `memory/` directory if it doesn't exist.
+
+If the file already exists (multiple sessions on the same day), append the new
+session as a new `## Session:` section.
+
+## 4. Commit
+
+Commit with explicit paths per context:
+
+```bash
+ak brain commit <context> -m "brain: memory <date>" \
+  --paths <memory-file-paths>
 ```
 
-Transcripts:
+No reindex needed — memory files aren't indexed entities.
 
-{transcripts}
-```
-
-## 3. Update the watermark
-
-After all subagents complete successfully:
+## 5. Update watermark
 
 ```bash
 python3 ~/.kiro/skills/action-brain-memory/scripts/memory-prep.py \
   --set-watermark <watermark_from_payload>
 ```
 
-The watermark value comes from the `watermark` field in the prep script output —
-it's the highest `updated_at` from the processed conversations.
+## 6. Report
 
-## 4. Report
-
-Summarise what was extracted:
-- Number of conversations processed
-- Entities created/updated per context
-- Key decisions and knowledge captured
+Summarise: number of sessions processed, dates covered, projects touched.
 
 ---
 
-# First Run / Initial Import
+# Batching
 
-On first run, the watermark is 0 so all conversations are returned. This is a
-one-time bulk import that needs special handling.
+For many conversations, delegate to subagents. Group by project — one subagent
+per project (or per batch of projects). Each subagent receives the turns and
+writes the memory files.
 
-**Volume:** use `--project` to process one project at a time, or batch by project
-name from the payload.
-
-**Precursor projects:** some projects may be predecessors of current ones (e.g.
-early prototypes that evolved into the current codebase). When spawning subagents,
-tell them which projects are precursors and what they became:
-
-> "The following projects are precursors to archie and should be treated as
-> archie context: ai-config, agent-workspace, ax, cli-tools, agent-executor"
-
-**Anchor against current state:** before extracting from historical conversations,
-read the current project documentation (README, CONTRIBUTING, docs/) and provide
-it to the subagent as context. The agent should only extract information that is
-still relevant to the current state. Anything that contradicts current docs or
-code is dead history — skip it.
-
-**Be highly selective:** the initial import will contain a lot of noise —
-dead-end explorations, reversed decisions, superseded designs. Extract only:
-- Decisions and rationale that are still reflected in the current codebase
-- Knowledge that remains true and useful
-- Feedback patterns that are still relevant
-- Design principles that carried forward
-
-After the initial import, subsequent runs will be incremental and much simpler —
-just new conversations since the last watermark.
+Maximum 4 subagents concurrently. The orchestrating agent handles the watermark
+update after all subagents complete.
 
 ---
 
@@ -223,18 +174,18 @@ just new conversations since the last watermark.
 ```bash
 # 1. Gather
 python3 ~/.kiro/skills/action-brain-memory/scripts/memory-prep.py > /tmp/memory-payload.json
-# Output: 12 conversations — 3 for tillo-platform, 7 for archie, 2 general
+# Found 5 conversations: 3 archie, 2 tillo-platform
 
-# 2. Process — spawn subagents with batches of transcripts
-# Subagent 1: tillo-platform conversations (3 transcripts)
-# Subagent 2: archie conversations (7 transcripts)
-# Subagent 3: general conversations (2 transcripts)
-# Each subagent determines context routing per extracted item
+# 2-3. Summarise and write
+# archie conversations → shared/projects/archie/memory/2026-04-18.md
+# tillo conversations → tillo/projects/tillo-platform/memory/2026-04-18.md
 
-# 3. Update watermark
-python3 ~/.kiro/skills/action-brain-memory/scripts/memory-prep.py --set-watermark 1713434567000
+# 4. Commit
+ak brain commit shared -m "brain: memory 2026-04-18" \
+  --paths projects/archie/memory/2026-04-18.md
+ak brain commit tillo -m "brain: memory 2026-04-18" \
+  --paths projects/tillo-platform/memory/2026-04-18.md
 
-# 4. Report
-# 5 knowledge entities created across shared and tillo contexts
-# 3 existing entities updated
+# 5. Update watermark
+python3 .../memory-prep.py --set-watermark 1713434567000
 ```

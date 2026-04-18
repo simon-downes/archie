@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Prepare conversation transcripts for memory extraction.
+"""Prepare conversation transcripts for memory summarisation.
 
-Reads kiro-cli conversation history, extracts transcripts, normalises project names,
-and outputs a JSON payload grouped by project — ready for LLM processing.
+Reads kiro-cli conversation history, parses transcripts into clean turn pairs
+(user input + assistant response), strips tool-use noise, and outputs structured
+data ready for LLM summarisation.
 
 Usage:
     python3 memory-prep.py [--since TIMESTAMP] [--project NAME] [--set-watermark TIMESTAMP]
@@ -17,9 +18,13 @@ Output (JSON to stdout):
         "conversations": [
             {
                 "project": "archie",
+                "date": "2026-04-18",
                 "conversation_id": "abc-123",
                 "updated_at": 1713434567000,
-                "transcript": "full transcript text..."
+                "turns": [
+                    {"user": "...", "assistant": "..."},
+                    ...
+                ]
             },
             ...
         ],
@@ -33,11 +38,15 @@ for general (non-project) sessions.
 import json
 import sqlite3
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 KIRO_DB = Path.home() / ".local" / "share" / "kiro-cli" / "data.sqlite3"
 BRAIN_DB = Path.home() / ".archie" / "brain" / "shared" / "brain.db"
 AK_CONFIG = Path.home() / ".agent-kit" / "config.yaml"
+
+# Lines matching these prefixes are stripped from assistant responses
+TOOL_NOISE = ("[Tool uses:", "[Tool use:", "[Subagent")
 
 
 def _project_dir_name() -> str:
@@ -84,12 +93,7 @@ def set_watermark(ts: int) -> None:
 
 
 def resolve_project(key: str) -> str:
-    """Extract project name from a conversation key (working directory path).
-
-    Uses the basename of project_dir (from agent-kit config) to find the project
-    root in any path, handling cross-platform differences (macOS /Users vs Linux /home).
-    Returns empty string if the key doesn't match a project directory.
-    """
+    """Extract project name from a conversation key (working directory path)."""
     dir_name = _project_dir_name()
     marker = f"/{dir_name}/"
     idx = key.find(marker)
@@ -101,10 +105,56 @@ def resolve_project(key: str) -> str:
     return remainder.split("/")[0]
 
 
+def parse_turns(transcript: list) -> list[dict]:
+    """Parse transcript items into user/assistant turn pairs.
+
+    User messages start with '>'. Consecutive non-user items are the assistant
+    response. Tool-use lines are stripped.
+    """
+    turns = []
+    current_user = None
+    current_asst = []
+
+    for item in transcript:
+        s = str(item).strip()
+        if not s:
+            continue
+
+        if s.startswith(">"):
+            if current_user is not None:
+                turns.append(_make_turn(current_user, current_asst))
+            current_user = s.lstrip("> ").strip()
+            current_asst = []
+        else:
+            if any(s.startswith(prefix) for prefix in TOOL_NOISE):
+                continue
+            # Strip inline tool-use markers
+            cleaned = s
+            for prefix in TOOL_NOISE:
+                while prefix in cleaned:
+                    start = cleaned.index(prefix)
+                    end = cleaned.find("]", start)
+                    if end == -1:
+                        break
+                    cleaned = (cleaned[:start] + cleaned[end + 1 :]).strip()
+            if cleaned:
+                current_asst.append(cleaned)
+
+    if current_user is not None:
+        turns.append(_make_turn(current_user, current_asst))
+
+    return turns
+
+
+def _make_turn(user: str, asst_parts: list[str]) -> dict:
+    """Create a turn dict from user text and assistant response parts."""
+    asst = "\n\n".join(p for p in asst_parts if p.strip())
+    return {"user": user, "assistant": asst}
+
+
 def main() -> None:
     args = sys.argv[1:]
 
-    # Handle --set-watermark
     if "--set-watermark" in args:
         idx = args.index("--set-watermark")
         ts = int(args[idx + 1])
@@ -112,7 +162,6 @@ def main() -> None:
         print(f"Watermark set to {ts}", file=sys.stderr)
         return
 
-    # Parse options
     since = None
     project_filter = None
     i = 0
@@ -155,19 +204,22 @@ def main() -> None:
         except json.JSONDecodeError:
             continue
 
-        transcript_parts = data.get("transcript", [])
-        if not transcript_parts:
+        transcript = data.get("transcript", [])
+        if not transcript:
             continue
 
-        transcript = "\n".join(str(t) for t in transcript_parts)
-        if len(transcript.strip()) < 100:
+        turns = parse_turns(transcript)
+        if not turns:
             continue
+
+        date = datetime.fromtimestamp(updated_at / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
 
         conversations.append({
             "project": project,
+            "date": date,
             "conversation_id": conversation_id,
             "updated_at": updated_at,
-            "transcript": transcript,
+            "turns": turns,
         })
         max_watermark = max(max_watermark, updated_at)
 
