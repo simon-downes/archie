@@ -1,7 +1,7 @@
 # Council Perspectives
 
 Each perspective defines a lens, biases, and what the persona cares about most.
-Select 3-5 per debate. More than 5 produces noise without proportional value.
+Select 3-4 per debate. Maximum 4 (subagent concurrency limit).
 
 ## Engineering
 

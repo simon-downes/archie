@@ -35,7 +35,7 @@ would disagree. Produces genuine intellectual friction, not rubber-stamping.
 
 # Perspectives
 
-Select 3-5 perspectives from [references/perspectives.md](references/perspectives.md).
+Select 3-4 perspectives from [references/perspectives.md](references/perspectives.md).
 
 **Selecting perspectives:** choose lenses that will produce genuine tension for the
 specific question. Don't pick perspectives that would all agree.
@@ -58,7 +58,7 @@ one on the fly following the same format.
 
 Single round of initial positions. No cross-referencing. Fast sanity check.
 
-- 4 parallel subagent calls
+- Up to 4 parallel subagent calls
 - ~10-15 seconds
 - 30-80 words per perspective
 - Use for: "Am I missing something obvious?" or "Quick gut check on this"
