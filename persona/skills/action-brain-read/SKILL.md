@@ -1,17 +1,19 @@
 ---
 name: action-brain-read
 description: >
-  Query Archie's second brain to retrieve relevant knowledge, contacts, projects, goals,
-  or other entities. Uses index lookup with grep fallback for comprehensive retrieval.
-  Use when answering questions that may be in the brain, looking up contacts or project
-  context, searching for knowledge on a topic, or when asked to "check the brain",
-  "what do I know about", or "find in brain".
+  Query Archie's second brain and conversation memory to retrieve relevant knowledge,
+  contacts, projects, goals, or past discussions. Uses index lookup, grep fallback, and
+  memory search. Use when answering questions that may be in the brain, looking up
+  contacts or project context, searching for knowledge on a topic, recalling past
+  conversations or decisions, or when asked to "check the brain", "what do I know about",
+  "what did we discuss", "what did we decide", or "find in brain".
 ---
 
 # Purpose
 
-Retrieve information from the brain using a two-step pattern: index lookup first, then
-full-text search as fallback. Synthesise findings into a useful response.
+Retrieve information from the brain and conversation memory. Index lookup first, then
+full-text search as fallback, then memory search for conversation history. Synthesise
+findings into a useful response.
 
 ---
 
@@ -78,7 +80,26 @@ rg -i "<search-term>" ~/.archie/brain/<context>/ --glob '!.git' -l
 
 Use `-l` (files only) first to identify relevant files, then read the specific files.
 
-## 4. Read matched files
+## 4. Search conversation memory
+
+When the query relates to past conversations, decisions, or "what did we discuss/do":
+
+```bash
+# Search memory by project
+rg -i "<search-term>" ~/.archie/brain/_memory/ -l
+
+# Recent memory for a specific project
+ls ~/.archie/brain/_memory/*-<project>.md | tail -5
+
+# Read the most recent memory file for a project
+cat ~/.archie/brain/_memory/$(ls ~/.archie/brain/_memory/*-<project>.md | tail -1)
+```
+
+Memory files contain structured conversation summaries with topic headings and
+Discussed/Decided/Action/Correction prefixes — scan headings first to find
+relevant sections.
+
+## 5. Read matched files
 
 Read the content of matched files:
 
@@ -89,7 +110,7 @@ cat ~/.archie/brain/<context>/<path>
 For multiple matches, read the most relevant ones (based on filename/path relevance
 to the query). Don't read everything — be selective.
 
-## 5. Synthesise
+## 6. Synthesise
 
 Combine findings into a response:
 

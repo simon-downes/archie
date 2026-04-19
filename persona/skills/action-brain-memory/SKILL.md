@@ -4,8 +4,9 @@ description: >
   Summarise recent conversations into structured memory files in the brain.
   Uses a prep script to extract clean turn pairs from kiro-cli history, then
   produces turn-by-turn summaries grouped by topic. Use when asked to "process
-  conversations", "update memory", "summarise recent sessions", "what did we
-  discuss", or "catch up on recent work".
+  conversations", "update memory", "summarise recent sessions", "run memory
+  ingestion", or "catch up on recent work". Not for recalling past conversations
+  — use action-brain-read for that.
 ---
 
 # Purpose

@@ -146,6 +146,9 @@ Credentials come from environment variables (e.g. `NOTION_TOKEN`, `LINEAR_TOKEN`
 
 ### ak brain — Second Brain Management
 
+> The brain is always available. Check it for domain context before relying on
+> general knowledge. Check `_memory/` for recent conversation history.
+
 Query and manage the brain. No credentials required.
 
 ```bash
