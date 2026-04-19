@@ -99,13 +99,13 @@ files. Watermark tracking ensures conversations are only processed once.
 
 ## Inbox and Outbox
 
-Human-in-the-loop checkpoints:
+Global operational queues at the brain root — device-local, not in any context's
+git repo.
 
-- **Inbox** — actionable items produced by ingestion (action items from meetings,
-  flagged conflicts, suggested updates). Review and trigger actions (e.g. "create
-  these as Linear tickets").
-- **Outbox** — draft messages produced by Archie. Review, send manually, delete
-  the draft.
+- **`_inbox/`** — items for the user to read. Research output, reports, generated
+  documents. Review and optionally ingest into the brain.
+- **`_outbox/`** — items for the user to act on. Draft messages, action items.
+  Review, send manually, delete when done.
 
 ## Git Conventions
 
@@ -125,10 +125,11 @@ Brain operations are driven by four skills:
 | Skill | Layer | Purpose |
 |-------|-------|---------|
 | `tool-brain` | Tool | CLI commands, file formats, shell tool patterns |
-| `action-brain-read` | Action | Query brain via index lookup + grep fallback |
+| `action-brain-read` | Action | Query brain and memory via index lookup + grep |
 | `action-brain-write` | Action | Write with dedup, routing, index update, commit |
-| `action-brain-ingest` | Action | Full ingestion pipeline from `_raw/inbox/` |
-| `action-brain-memory` | Action | Extract decisions and knowledge from conversation history |
+| `action-brain-ingest` | Action | Ingestion pipeline from `_raw/inbox/` or direct path |
+| `action-brain-memory` | Action | Summarise conversations into memory files |
+| `action-research` | Action | Research a topic, produce document in `_inbox/` |
 
 ## Knowledge Structure
 

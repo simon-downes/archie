@@ -25,6 +25,8 @@ brain/
 │   ├── inbox/               # Items to process
 │   ├── processing/          # Currently being processed
 │   └── completed/           # Done
+├── _inbox/                  # Items for user to read (research output, reports)
+├── _outbox/                 # Items for user to act on (drafts, action items)
 ├── _memory/                 # Conversation memory (device-local, no git)
 │   ├── 2026-04-18-archie.md
 │   ├── 2026-04-14-tillo-platform.md
@@ -35,8 +37,6 @@ brain/
 │   ├── projects/            # Active work
 │   ├── knowledge/           # Concepts, reference material
 │   ├── goals/               # Priorities, OKRs
-│   ├── inbox/               # Actionable items awaiting review
-│   ├── outbox/              # Draft messages
 │   ├── journal/             # Logs
 │   ├── archive/             # Retired entities
 │   ├── index.yaml           # Entity lookup index
@@ -44,7 +44,8 @@ brain/
 └── <work-context>/          # Company/org context (git repo, same structure)
 ```
 
-Each context is an independent git repo. `_raw/` sits outside contexts.
+Each context is an independent git repo. `_raw/`, `_inbox/`, `_outbox/`, and
+`_memory/` sit outside contexts — device-local operational directories.
 
 ## CLI Commands
 

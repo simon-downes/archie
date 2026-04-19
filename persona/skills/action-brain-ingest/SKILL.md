@@ -1,17 +1,17 @@
 ---
 name: action-brain-ingest
 description: >
-  Process raw content from the brain's ingestion pipeline into structured brain entities.
-  Handles the full flow from _raw/inbox through extraction, context routing, entity
-  creation/update, provenance tracking, and git commits. Use when processing brain inbox
-  items, ingesting documents or notes into the brain, running the ingestion pipeline, or
-  when asked to "process inbox", "ingest into brain", or "process raw items".
+  Process content into structured brain entities. Handles files from _raw/inbox,
+  _inbox, or a specific file path. Extracts information, routes to the correct
+  context, creates/updates entities, tracks provenance, and commits. Use when
+  asked to "process inbox", "ingest into brain", "ingest this file", or
+  "process raw items".
 ---
 
 # Purpose
 
-Process items from `_raw/inbox/` through the full ingestion pipeline: extract structured
-information, route to the correct context(s), create or update brain entities, record
+Process content through the ingestion pipeline: extract structured information,
+route to the correct context(s), create or update brain entities, record
 provenance, and commit.
 
 ---
@@ -19,8 +19,8 @@ provenance, and commit.
 # When to Use
 
 - Processing items in `_raw/inbox/`
+- Ingesting a specific file (e.g. research output from `_inbox/`)
 - User drops content for brain ingestion
-- Running the ingestion pipeline
 
 # When Not to Use
 
@@ -31,7 +31,12 @@ provenance, and commit.
 
 # Workflow
 
-## 1. Check the pipeline
+## 1. Determine source
+
+**Direct file path:** if the user specifies a file (e.g. "ingest `_inbox/research.md`"),
+process that file directly — skip to step 3.
+
+**Pipeline mode:** check `_raw/inbox/` for items to process:
 
 ```bash
 ak brain status
@@ -41,7 +46,7 @@ Look at the `raw.inbox` list. If empty, report "nothing to ingest" and stop.
 
 Process items one at a time, in order.
 
-## 2. Pick and move item
+## 2. Pick and move item (pipeline mode only)
 
 Move the item from inbox to processing:
 
