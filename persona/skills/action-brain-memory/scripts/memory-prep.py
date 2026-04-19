@@ -202,11 +202,15 @@ def load_sqlite_conversations(since: int) -> list[dict]:
 # --- File-based format (newer) ---
 
 
-def _parse_jsonl_turns(jsonl_path: Path) -> list[dict]:
-    """Parse a .jsonl session file into user/assistant turn pairs."""
+def _parse_jsonl_turns(jsonl_path: Path, since_ts: int = 0) -> list[dict]:
+    """Parse a .jsonl session file into user/assistant turn pairs.
+
+    Only includes turns where the Prompt timestamp is after since_ts (unix seconds).
+    """
     turns = []
     current_user = None
     current_asst: list[str] = []
+    include_turn = since_ts == 0
 
     with jsonl_path.open() as f:
         for line in f:
@@ -222,19 +226,21 @@ def _parse_jsonl_turns(jsonl_path: Path) -> list[dict]:
             data = entry.get("data", {})
 
             if kind == "Prompt":
-                if current_user is not None:
+                if current_user is not None and include_turn:
                     turns.append(_make_turn(current_user, current_asst))
                 current_user = _extract_text(data)
                 current_asst = []
+                ts = data.get("meta", {}).get("timestamp", 0)
+                include_turn = ts > since_ts
 
-            elif kind == "AssistantMessage":
+            elif kind == "AssistantMessage" and include_turn:
                 text = _extract_text(data)
                 if text:
                     cleaned = _strip_tool_noise(text)
                     if cleaned:
                         current_asst.append(cleaned)
 
-    if current_user is not None:
+    if current_user is not None and include_turn:
         turns.append(_make_turn(current_user, current_asst))
 
     return turns
@@ -290,7 +296,7 @@ def load_file_conversations(since: int) -> list[dict]:
         if not agent_name:
             continue
 
-        turns = _parse_jsonl_turns(jsonl_path)
+        turns = _parse_jsonl_turns(jsonl_path, since_ts=since // 1000)
         if not turns:
             continue
 
