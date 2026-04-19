@@ -71,6 +71,23 @@ ak auth set linear token
 
 See [Linear docs](../agent-kit/docs/linear.md) for team and project filtering.
 
+### Jira
+
+Enables Jira Cloud issue tracking — querying, creating, updating, and transitioning issues.
+
+1. Create a [scoped API token](https://id.atlassian.com/manage-profile/security/api-tokens)
+   with classic scopes: `read:jira-work`, `read:jira-user`, `write:jira-work`
+2. Get your cloud ID from `https://<your-site>.atlassian.net/_edge/tenant_info`
+3. Store credentials:
+
+```bash
+ak auth set jira email
+ak auth set jira token
+ak auth set jira cloud_id
+```
+
+See [Jira docs](../agent-kit/docs/jira.md) for full command reference.
+
 ### Slack
 
 Enables sending messages to Slack channels via incoming webhooks.

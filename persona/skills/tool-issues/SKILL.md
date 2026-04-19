@@ -3,7 +3,7 @@ name: tool-issues
 description: >
   Generic interface for issue tracking operations with provider-specific references.
   Covers listing, creating, updating, commenting on, and transitioning issues. Dispatches
-  to the correct provider (Linear, GitHub Issues) based on project config. Use when working
+  to the correct provider (Linear, GitHub Issues, Jira) based on project config. Use when working
   with issues, tickets, or tasks in any tracker.
 ---
 
@@ -44,6 +44,7 @@ for each provider; Available Tools provides the actual CLI commands.
 |----------|-----------|------------|
 | Linear   | [provider-linear.md](references/provider-linear.md) | `linear` |
 | GitHub   | [provider-github.md](references/provider-github.md) | `github` |
+| Jira     | [provider-jira.md](references/provider-jira.md)     | `jira`   |
 
 ---
 
