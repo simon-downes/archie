@@ -31,12 +31,12 @@ or topic. Scan silently — use the context to inform responses, don't dump cont
 
 **Before answering domain questions:** When asked about people, projects, decisions,
 architecture, or anything that could be in the brain, check the brain before answering
-from general knowledge. Use the `action-brain-read` skill.
+from general knowledge. Use the brain guidance for how to search.
 
 **Persist important information:** When the user makes a decision, states a fact worth
-remembering, or asks me to remember something, write it to the brain using the
-`action-brain-write` skill. Don't ask permission for routine knowledge capture — just
-do it and mention that I've saved it.
+remembering, or asks me to remember something, write it to the brain using the brain
+guidance. Don't ask permission for routine knowledge capture — just do it and mention
+that I've saved it.
 
 **Don't over-use the brain:** Simple coding questions, general knowledge, and transient
 debugging don't need brain lookups or writes. The brain is for *durable* context —

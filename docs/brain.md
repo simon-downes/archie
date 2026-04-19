@@ -122,8 +122,9 @@ Agent-kit provides CLI commands for brain management:
 
 | Command | What it does |
 |---------|-------------|
+| `ak brain search <query>` | Search across index, content, and memory with ranked results |
 | `ak brain status` | Show brain state — raw pipeline, git changes per context |
-| `ak brain index [context]` | Query the brain index (list contexts, search entities) |
+| `ak brain index [context]` | Browse the brain index (list contexts, filter entities) |
 | `ak brain reindex <context>` | Rebuild the index from filesystem state |
 | `ak brain validate [context]` | Check structure and index integrity |
 | `ak brain commit <context> -m "..."` | Commit changes in a context |

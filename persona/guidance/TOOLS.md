@@ -144,47 +144,6 @@ separate repo — Scalr CLI is read-only inspection.
 CLI toolkit for structured access to SaaS APIs. Outputs JSON to stdout, errors to stderr.
 Credentials come from environment variables (e.g. `NOTION_TOKEN`, `LINEAR_TOKEN`).
 
-### ak brain — Second Brain Management
-
-> The brain is always available. Check it for domain context before relying on
-> general knowledge. Check `_memory/` for recent conversation history.
-
-Query and manage the brain. No credentials required.
-
-```bash
-# List contexts
-ak brain index
-
-# Query a context's index
-ak brain index shared
-ak brain index shared --type knowledge
-ak brain index shared --slug aurora-failover
-
-# Rebuild index from filesystem
-ak brain reindex shared
-
-# Stage and commit specific files (preferred)
-ak brain commit shared -m "brain: add aurora knowledge" \
-  --paths knowledge/aurora-failover.md --paths index.yaml
-
-# Stage and commit all changes
-ak brain commit shared -m "brain: bulk update"
-
-# Show status (raw pipeline + git changes)
-ak brain status
-
-# Validate structure and index integrity
-ak brain validate
-
-# Get project config
-ak brain project my-app
-```
-
-**When to use:** Querying the brain index, rebuilding indexes after writes, committing
-changes, checking brain status. For full-text search, use `rg` directly. For reading
-and writing brain content, use the brain skills (`action-brain-read`, `action-brain-write`,
-`action-brain-ingest`).
-
 ### ak notion — Notion Integration
 
 Communicates via the Notion MCP proxy. Requires `NOTION_TOKEN` env var.

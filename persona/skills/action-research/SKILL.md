@@ -26,8 +26,8 @@ a single well-structured document ready for the user to read.
 
 - Simple factual questions ("what's the default timeout?") — just search and answer
 - Questions about the current codebase — read the code
-- Questions about past conversations — use `action-brain-read`
-- Writing or updating brain content — use `action-brain-write`
+- Questions about past conversations — use brain guidance
+- Writing or updating brain content — use brain guidance
 
 ---
 
