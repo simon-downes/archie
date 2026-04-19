@@ -276,6 +276,58 @@ ak linear upload ./screenshot.png
 adding comments. Use `ak linear team <key>` to discover available statuses before filtering
 or updating. Prefer `--limit` to keep output concise.
 
+### ak jira — Jira Cloud Integration
+
+REST API v3 with scoped API tokens. Requires `JIRA_EMAIL`, `JIRA_TOKEN`, `JIRA_CLOUD_ID` env vars.
+
+**Structure and context:**
+```bash
+# List projects
+ak jira projects
+
+# Get project details with issue types
+ak jira project PLAT
+
+# List statuses for a project
+ak jira statuses PLAT
+```
+
+**Issues:**
+```bash
+# List issues with filters (composed into JQL)
+ak jira issues --project PLAT --status "In Progress" --limit 10
+ak jira issues --project PLAT --assignee "Simon" --type "Bug"
+
+# Raw JQL for complex queries
+ak jira issues --jql 'project = PLAT AND sprint in openSprints()'
+
+# Get full issue detail
+ak jira issue PLAT-123
+
+# Create and update
+ak jira create-issue --project PLAT --summary "Fix bug" --type Task
+ak jira update-issue PLAT-123 --priority High
+
+# Transition status (uses workflow transitions, not direct field update)
+ak jira transition PLAT-123 --status "In Progress"
+```
+
+**Comments:**
+```bash
+ak jira comments PLAT-123
+ak jira comment PLAT-123 --message "Looks good"
+```
+
+**Attachments:**
+```bash
+ak jira attach PLAT-123 ./screenshot.png
+```
+
+**When to use:** Managing Jira issues, checking issue status, creating/updating issues,
+adding comments and attachments. Use `ak jira statuses <project>` to discover available
+statuses before filtering or transitioning. Status changes use `transition`, not
+`update-issue`. Prefer `--limit` to keep output concise.
+
 ### ak slack — Slack Integration
 
 Send messages via incoming webhooks. Requires `SLACK_WEBHOOK_URL` env var.
