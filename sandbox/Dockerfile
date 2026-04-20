@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y \
     nano \
     sqlite3 \
     ripgrep \
+    pandoc \
     fd-find \
     tree \
     shellcheck \

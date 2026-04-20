@@ -41,6 +41,8 @@ DEFAULT_CONFIG = {
         "JIRA_EMAIL": "ak.jira.email",
         "JIRA_TOKEN": "ak.jira.token",
         "JIRA_CLOUD_ID": "ak.jira.cloud_id",
+        "GOOGLE_CLIENT_ID": "ak.google.client_id",
+        "GOOGLE_CLIENT_SECRET": "ak.google.client_secret",
     },
     "mounts": [
         ["~/.archie/persona/agents", "~/.kiro/agents"],

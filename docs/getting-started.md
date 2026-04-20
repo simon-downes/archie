@@ -88,6 +88,22 @@ ak auth set jira cloud_id
 
 See [Jira docs](../agent-kit/docs/jira.md) for full command reference.
 
+### Google Workspace
+
+Enables read-only access to Gmail, Calendar, and Google Drive.
+
+1. Create a Google Cloud project with a Desktop App OAuth client
+2. Enable Gmail API, Calendar API, and Drive API
+3. Store credentials and authenticate:
+
+```bash
+ak auth set google client_id
+ak auth set google client_secret
+ak auth login google
+```
+
+See [Google Workspace docs](../agent-kit/docs/google.md) for full command reference.
+
 ### Slack
 
 Enables sending messages to Slack channels via incoming webhooks.

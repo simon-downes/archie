@@ -287,6 +287,48 @@ adding comments and attachments. Use `ak jira statuses <project>` to discover av
 statuses before filtering or transitioning. Status changes use `transition`, not
 `update-issue`. Prefer `--limit` to keep output concise.
 
+### ak google — Google Workspace Integration
+
+Read-only access to Gmail, Calendar, and Drive. Requires Google OAuth (`ak auth login google`).
+
+**Mail:**
+```bash
+# Search emails (Gmail query syntax)
+ak google mail search "from:jane subject:platform"
+ak google mail recent --hours 8
+ak google mail unread --limit 10
+
+# Read and download an email
+ak google mail read <message-id>
+ak google mail read <message-id> --to-inbox
+ak google mail read <message-id> --stdout
+```
+
+**Calendar:**
+```bash
+ak google calendar today
+ak google calendar upcoming --days 3
+ak google calendar event <event-id>
+```
+
+**Drive:**
+```bash
+# Search and list files
+ak google drive search "roadmap"
+ak google drive recent --days 1
+ak google drive list --folder <folder-id>
+
+# Fetch files (Docs → markdown, Sheets → CSV, binary → download)
+ak google drive fetch <file-id>
+ak google drive fetch <file-id> --to-inbox
+ak google drive fetch <file-id> --stdout
+ak google drive fetch <file-id> --format pdf
+```
+
+**When to use:** Reading emails for context, checking calendar for scheduling, fetching
+documents and meeting transcripts for brain ingestion. Use `--to-inbox` to send files
+directly to the brain raw inbox for processing.
+
 ### ak slack — Slack Integration
 
 Send messages via incoming webhooks. Requires `SLACK_WEBHOOK_URL` env var.
