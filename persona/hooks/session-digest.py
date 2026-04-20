@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""AgentSpawn hook — inject learning context from signals and recent memory."""
+"""AgentSpawn hook — inject learning signals into session context."""
 
-import glob
 import re
 from pathlib import Path
 
 SIGNALS_PATH = Path.home() / ".archie" / "brain" / "_memory" / "signals.yaml"
-MEMORY_DIR = Path.home() / ".archie" / "brain" / "_memory"
 MAX_SIGNALS = 7
 PATTERN_THRESHOLD = 2
 
@@ -42,17 +40,6 @@ def detect_patterns(signals: list[dict]) -> list[str]:
     return [f"{cat}: {n} occurrences" for cat, n in sorted(counts.items()) if n >= PATTERN_THRESHOLD]
 
 
-def current_status() -> str:
-    files = sorted(glob.glob(str(MEMORY_DIR / "*.md")), reverse=True)
-    for f in files[:3]:
-        text = Path(f).read_text()
-        marker = "CURRENT STATUS:"
-        idx = text.rfind(marker)
-        if idx != -1:
-            return text[idx + len(marker) :].strip().split("\n")[0].strip()
-    return ""
-
-
 def main() -> None:
     signals = load_signals()
     if not signals:
@@ -61,7 +48,6 @@ def main() -> None:
     recent = [s for s in reversed(signals) if s.get("type") in ("correction", "failure")]
     recent = recent[:MAX_SIGNALS]
     patterns = detect_patterns(signals)
-    status = current_status()
 
     lines = ["LEARNING CONTEXT:"]
 
@@ -74,9 +60,6 @@ def main() -> None:
         lines.append("Patterns:")
         for p in patterns:
             lines.append(f"- {p}")
-
-    if status:
-        lines.append(f"Status: {status}")
 
     print("\n".join(lines))
 
