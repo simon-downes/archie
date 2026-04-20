@@ -106,14 +106,23 @@ See [Google Workspace docs](../agent-kit/docs/google.md) for full command refere
 
 ### Slack
 
-Enables sending messages to Slack channels via incoming webhooks.
+Enables reading channels and searching messages, plus sending notifications.
 
-1. Create an [incoming webhook](https://api.slack.com/messaging/webhooks) for your workspace
-2. Store the URL:
+**Read access** — requires a Slack app with PKCE OAuth:
+
+```bash
+ak auth set slack client_id
+ak auth set slack client_secret
+ak auth login slack
+```
+
+**Write access** — uses an incoming webhook:
 
 ```bash
 ak auth set slack webhook_url
 ```
+
+See [Slack docs](../agent-kit/docs/slack.md) for app setup and full command reference.
 
 ### AWS
 

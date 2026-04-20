@@ -331,8 +331,33 @@ directly to the brain raw inbox for processing.
 
 ### ak slack — Slack Integration
 
-Send messages via incoming webhooks. Requires `SLACK_WEBHOOK_URL` env var.
+Read channels and search messages via user token. Send messages via webhooks.
+Requires `SLACK_WEBHOOK_URL` env var for sending. User token via `ak auth login slack` for reading.
 
+**Reading channels:**
+```bash
+# List channels
+ak slack channels
+
+# Read recent messages
+ak slack history "#platform" --since 24
+ak slack history "#platform" --limit 20
+
+# Read a thread
+ak slack thread "#platform" 1776709000.123456
+
+# Search messages (Slack query syntax, sorted by date)
+ak slack search "from:jane aurora"
+ak slack search "in:#platform after:2026-04-01"
+```
+
+**Users:**
+```bash
+ak slack users
+ak slack users "simon"
+```
+
+**Sending messages:**
 ```bash
 # Simple text message (supports mrkdwn)
 ak slack send "Deploy complete :white_check_mark:"

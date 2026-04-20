@@ -38,6 +38,8 @@ DEFAULT_CONFIG = {
         "SCALR_HOSTNAME": "ak.scalr.hostname",
         "LINEAR_TOKEN": "ak.linear.token",
         "SLACK_WEBHOOK_URL": "ak.slack.webhook_url",
+        "SLACK_CLIENT_ID": "ak.slack.client_id",
+        "SLACK_CLIENT_SECRET": "ak.slack.client_secret",
         "JIRA_EMAIL": "ak.jira.email",
         "JIRA_TOKEN": "ak.jira.token",
         "JIRA_CLOUD_ID": "ak.jira.cloud_id",
