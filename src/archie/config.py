@@ -47,6 +47,7 @@ DEFAULT_CONFIG = {
         ["~/.archie/persona/skills", "~/.kiro/skills"],
         ["~/.archie/persona/prompts", "~/.kiro/prompts"],
         ["~/.archie/persona/guidance", "~/.kiro/steering"],
+        ["~/.archie/persona/hooks", "~/.kiro/hooks"],
         ["~/.agent-kit", "~/.agent-kit:ro"],
         [_KIRO_DATA_DIR, "~/.local/share/kiro-cli"],
         "~/.toad",
