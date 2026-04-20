@@ -336,6 +336,79 @@ def _make_turn(user: str, asst_parts: list[str]) -> dict:
     return {"user": user, "assistant": asst}
 
 
+# --- Signal extraction ---
+
+import re
+
+CORRECTION_PATTERNS = [
+    re.compile(r"\bno[,.]?\s+(that'?s|it'?s|you)\b", re.I),
+    re.compile(r"\bwrong\b", re.I),
+    re.compile(r"\bactually[,.]?\s", re.I),
+    re.compile(r"\bthat'?s not what i\b", re.I),
+    re.compile(r"\bi meant\b", re.I),
+    re.compile(r"\btry (?:using|with|this)\b", re.I),
+    re.compile(r"\binstead[,.]?\s", re.I),
+    re.compile(r"\bnot (?:quite|right|correct)\b", re.I),
+    re.compile(r"\bshould (?:be|have|use)\b", re.I),
+]
+
+FAILURE_PATTERNS = [
+    re.compile(r"\berror\b", re.I),
+    re.compile(r"\bfailed\b", re.I),
+    re.compile(r"\bdoesn'?t work\b", re.I),
+    re.compile(r"\bstill (?:broken|failing|not)\b", re.I),
+    re.compile(r"\bsame (?:error|issue|problem)\b", re.I),
+]
+
+SUCCESS_PATTERNS = [
+    re.compile(r"\b(?:great|perfect|awesome|nice|excellent)\b", re.I),
+    re.compile(r"\bthat works\b", re.I),
+    re.compile(r"\blooks? good\b", re.I),
+    re.compile(r"\bexactly (?:what|right)\b", re.I),
+]
+
+
+def extract_signals(conversations: list[dict]) -> list[dict]:
+    """Extract correction/failure/success signals from conversation turns."""
+    signals: list[dict] = []
+
+    for conv in conversations:
+        project = conv.get("project", "")
+        date = conv.get("date", "")
+
+        for turn in conv.get("turns", []):
+            user_msg = turn.get("user", "")
+            if len(user_msg) < 5:
+                continue
+
+            signal = _classify_turn(user_msg)
+            if signal:
+                signals.append({
+                    "timestamp": date,
+                    "project": project,
+                    "type": signal,
+                    "message": user_msg[:200],
+                })
+
+    return signals
+
+
+def _classify_turn(user_msg: str) -> str | None:
+    """Classify a user message as correction, failure, success, or None."""
+    correction_hits = sum(1 for p in CORRECTION_PATTERNS if p.search(user_msg))
+    failure_hits = sum(1 for p in FAILURE_PATTERNS if p.search(user_msg))
+    success_hits = sum(1 for p in SUCCESS_PATTERNS if p.search(user_msg))
+
+    # Require 2+ pattern matches to reduce false positives
+    if correction_hits >= 2:
+        return "correction"
+    if failure_hits >= 2:
+        return "failure"
+    if success_hits >= 2:
+        return "success"
+    return None
+
+
 # --- Main ---
 
 
@@ -378,11 +451,16 @@ def main() -> None:
 
     max_watermark = max((c["updated_at"] for c in conversations), default=since)
 
+    signals = extract_signals(conversations)
+
     print(
-        json.dumps({"conversations": conversations, "watermark": max_watermark}, indent=2),
+        json.dumps(
+            {"conversations": conversations, "signals": signals, "watermark": max_watermark},
+            indent=2,
+        ),
         file=sys.stdout,
     )
-    print(f"Found {len(conversations)} conversations since {since}", file=sys.stderr)
+    print(f"Found {len(conversations)} conversations, {len(signals)} signals since {since}", file=sys.stderr)
 
 
 if __name__ == "__main__":

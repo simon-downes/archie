@@ -45,7 +45,7 @@ Check what's available:
 cat /tmp/memory-payload.json | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
-print(f'{len(data[\"conversations\"])} conversations')
+print(f'{len(data[\"conversations\"])} conversations, {len(data[\"signals\"])} signals')
 for c in data['conversations']:
     p = c['project'] or '(general)'
     print(f'  {c[\"date\"]} {p:20s} {len(c[\"turns\"]):>3} turns')
@@ -97,6 +97,32 @@ CURRENT STATUS: All features implemented. Memory pipeline operational.
 python3 ~/.kiro/skills/action-brain-update/scripts/memory-prep.py \
   --set-watermark <watermark_from_payload>
 ```
+
+### Process signals
+
+The payload includes a `signals` array with mechanically-detected corrections,
+failures, and successes from user messages. These are raw detections — review
+them and write meaningful ones to the global signals file.
+
+For each signal worth keeping:
+1. Read the signal's `message` field and the surrounding conversation context
+2. Write a concise, actionable summary (not the raw user message)
+3. Assign a category (api-integration, configuration, implementation, architecture, etc.)
+
+Append to `~/.archie/brain/_memory/signals.yaml`:
+
+```yaml
+- timestamp: 2026-04-19
+  project: archie
+  type: correction
+  category: api-integration
+  summary: "Jira scoped tokens use Basic auth at api.atlassian.com, not Bearer"
+```
+
+Skip signals that are:
+- False positives (pattern matched but not actually a correction/failure)
+- Trivial (typo corrections, minor clarifications)
+- Duplicates of signals already in the file
 
 ### Batching
 
