@@ -29,6 +29,7 @@ packages = ["src/archie"]
 
 [tool.uv]
 package = true
+workspace.exclude = ["agent-kit"]
 
 [tool.ruff]
 line-length = 100
