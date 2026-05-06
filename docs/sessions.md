@@ -11,7 +11,8 @@ Run `archie` from inside a project directory (a subdirectory of your configured
 - Your project directory is mounted read-write
 - The brain is mounted read-only — available as context, not for editing
 - Container is named `archie-shell-<project>` (e.g. `archie-shell-my-app`)
-- Only one session per project at a time — starting a second is blocked
+- Only one session per project at a time — starting a second prompts to start a
+  general session instead
 
 Use for: working on a specific project — coding, debugging, planning, reviewing.
 

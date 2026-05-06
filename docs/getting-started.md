@@ -162,37 +162,30 @@ ak auth status
 
 ## 4. Brain Setup
 
-The brain is Archie's persistent knowledge store — files on disk, organised into contexts
-(each a separate git repo). See [Brain](brain.md) for how Archie uses it.
-
-### Configure Contexts
-
-Edit `~/.agent-kit/config.yaml` to define your brain contexts:
-
-```yaml
-brain:
-  dir: ~/.archie/brain
-  contexts:
-    shared: null                                    # local-only
-    work-acme: git@github.com:you/brain-acme.git    # cloned from remote
-    personal: git@github.com:you/brain-personal.git
-```
-
-`shared` is the default context for cross-cutting knowledge (identity, contacts, general
-reference). Additional contexts separate different areas of life or work. Contexts with a
-git URL are cloned; `null` contexts are created locally.
+The brain is a persistent knowledge base — files on disk in a single git repo.
+See [Brain](brain.md) for structure and usage.
 
 ### Initialise
 
 ```bash
-ak brain init
+ak init
 ```
 
-This creates the brain directory structure, the raw processing pipeline, and
-initialises/clones all configured contexts.
+This prompts for your name and agent name, then creates the brain directory structure
+with a convention guide (`BRAIN.md`), user profile skeleton, and agent operational files.
 
-See [agent-kit brain docs](../agent-kit/docs/brain.md) for context structure, indexing,
-and project configuration.
+### First Run
+
+```bash
+archie
+```
+
+On first run after install, Archie deploys seed files to the brain (`soul.md`, `tools.md`)
+which form the basis of the system prompt. These are evolvable — Archie can modify them
+over time.
+
+See [agent-kit brain docs](../agent-kit/docs/brain.md) for search, indexing, and
+reference tracking.
 
 ## 5. Configure Project Directory
 
