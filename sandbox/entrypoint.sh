@@ -50,15 +50,17 @@ if [ -d "$brain_dir" ]; then
     fi
 
     # 5. Tools — available tools and usage patterns
-    # 6. User profile — who the user is
-    for file in \
-        "$agent_dir/tools.md" \
-        ${user_name:+"$user_dir/profile.md"}; do
-        if [ -f "$file" ] && [ -s "$file" ]; then
-            cat "$file" >> "$prompt_out"
-            printf '\n\n' >> "$prompt_out"
-        fi
-    done
+    if [ -f "$agent_dir/tools.md" ] && [ -s "$agent_dir/tools.md" ]; then
+        cat "$agent_dir/tools.md" >> "$prompt_out"
+        printf '\n\n' >> "$prompt_out"
+    fi
+
+    # 6. User profile — who the user is, informs communication style and decisions
+    if [ -n "$user_name" ] && [ -f "$user_dir/profile.md" ] && [ -s "$user_dir/profile.md" ]; then
+        # Strip YAML frontmatter if present
+        sed '1{/^---$/!b};1,/^---$/d' "$user_dir/profile.md" >> "$prompt_out"
+        printf '\n\n' >> "$prompt_out"
+    fi
 fi
 
 exec "$@"

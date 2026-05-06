@@ -56,7 +56,7 @@ def main() -> None:
     if not recent and not patterns:
         return
 
-    lines = ["# Signals", ""]
+    lines = ["# Signals", "", "These are recent mistakes and corrections. Avoid repeating them.", ""]
 
     if recent:
         lines.append("Recent corrections/failures:")
