@@ -168,6 +168,10 @@ RUN SCALR_VERSION=$(curl -fsSL https://api.github.com/repos/Scalr/scalr-cli/rele
 # Pre-seed GitHub SSH host keys
 RUN ssh-keyscan github.com >> /etc/ssh/ssh_known_hosts 2>/dev/null
 
+# Install entrypoint
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod 755 /usr/local/bin/entrypoint.sh
+
 # Create user with matching UID from host (group uses username)
 RUN groupadd $USERNAME \
     && useradd --uid $USER_UID --gid $USERNAME -m -s /bin/bash $USERNAME \
@@ -202,7 +206,5 @@ RUN uv tool install git+https://github.com/simon-downes/agent-kit.git
 # Ensure user's tool bin is in PATH
 ENV PATH="/home/${USERNAME}/.local/bin:${PATH}"
 
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod 755 /usr/local/bin/entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["/bin/bash"]
