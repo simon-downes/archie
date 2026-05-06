@@ -204,7 +204,8 @@ RUN uv tool install batrachian-toad
 RUN uv tool install git+https://github.com/simon-downes/agent-kit.git
 
 # Ensure user's tool bin is in PATH
-ENV PATH="/home/${USERNAME}/.local/bin:${PATH}"
+ENV PATH="/home/${USERNAME}/.local/bin:${PATH}" \
+    LESSCHARSET=utf-8
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["/bin/bash"]
