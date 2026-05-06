@@ -151,6 +151,16 @@ def _format_delta(delta: timedelta) -> str:
     return f"{seconds // 86400}d"
 
 
+def set_terminal_title(project: str | None = None) -> None:
+    """Set the terminal window title via OSC escape sequence."""
+    import sys
+
+    title = f"Archie — {project}" if project else "Archie — general"
+    if sys.stdout.isatty():
+        sys.stdout.write(f"\033]0;{title}\007")
+        sys.stdout.flush()
+
+
 def display_header(
     tool_name: str | None = None,
     project: str | None = None,
@@ -161,6 +171,8 @@ def display_header(
 
     from archie import __version__
     from archie.config import load_config
+
+    set_terminal_title(project)
 
     banner_lines = [
         " █████╗ ██████╗  ██████╗██╗  ██╗██╗███████╗",

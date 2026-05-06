@@ -202,4 +202,6 @@ RUN uv tool install git+https://github.com/simon-downes/agent-kit.git
 # Ensure user's tool bin is in PATH
 ENV PATH="/home/${USERNAME}/.local/bin:${PATH}"
 
+COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["/bin/bash"]

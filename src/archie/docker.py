@@ -164,7 +164,22 @@ def run_container(command: list[str], tool_name: str = "shell", session: str | N
             from archie.output import print_error
 
             print_error(f"Session [bright_blue]{container_name}[/bright_blue] already running")
-            return 1
+            if project and sys.stdin.isatty():
+                try:
+                    reply = input("  Start a general session instead? [y/N] ")
+                except (EOFError, KeyboardInterrupt):
+                    return 1
+                if reply.strip().lower() != "y":
+                    return 1
+                # Switch to general session
+                import hashlib
+                import time
+
+                project = None
+                suffix = hashlib.sha1(str(time.time_ns()).encode()).hexdigest()[:5]
+                container_name = f"{CONTAINER_PREFIX}general-{suffix}"
+            else:
+                return 1
 
     from archie.output import display_header
 
@@ -193,6 +208,10 @@ def run_container(command: list[str], tool_name: str = "shell", session: str | N
 
     for name, value in {**env, **creds}.items():
         args.extend(["-e", f"{name}={value}"])
+
+    # Terminal title — set inside container to override any shell/Docker defaults
+    title = f"Archie — {project.name}" if project else "Archie — general"
+    args.extend(["-e", f"ARCHIE_TITLE={title}"])
 
     for host_path, container_mount in mounts:
         args.extend(["-v", f"{host_path}:{container_mount}"])
