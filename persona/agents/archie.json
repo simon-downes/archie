@@ -62,18 +62,8 @@
     "file://README.md",
     "file://CONTRIBUTING.md",
     "file://AGENTS.md",
-    "skill://~/.kiro/steering/TOOLS.md",
     "skill://~/.kiro/skills/**/SKILL.md"
   ],
-  "hooks": {
-    "agentSpawn": [
-      {
-        "command": "python3",
-        "args": ["~/.kiro/hooks/session-digest.py"],
-        "timeout_ms": 5000
-      }
-    ]
-  },
   "includeMcpJson": false,
   "keyboardShortcut": "ctrl+shift+p",
   "welcomeMessage": "Hey {{USER}}, Archie here. Ready when you are."

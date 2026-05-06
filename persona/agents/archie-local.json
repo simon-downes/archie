@@ -71,7 +71,6 @@
     "file://README.md",
     "file://CONTRIBUTING.md",
     "file://AGENTS.md",
-    "skill://~/.kiro/steering/TOOLS.md",
     "file://~/.kiro/steering/LOCAL.md",
     "skill://~/.kiro/skills/**/SKILL.md"
   ],

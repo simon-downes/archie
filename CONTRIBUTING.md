@@ -26,8 +26,9 @@ archie/
 ├── persona/                     # Who Archie is
 │   ├── agents/                  # Agent configs (JSON) — orchestrator + subagents
 │   ├── skills/                  # Layered knowledge modules
-│   ├── prompts/                 # System prompts (.prompt.md)
-│   └── guidance/                # Steering files (tool usage, conventions)
+│   ├── prompts/                 # Subagent prompts + build-signals.py
+│   ├── seeds/                   # Default brain files (soul.md, tools.md)
+│   └── guidance/                # Steering files (local mode)
 ├── src/archie/                  # Platform capabilities (Python CLI)
 │   ├── cli.py                   # Click CLI — archie, shell, install, build, status
 │   ├── config.py                # Config loading, project discovery, status checks
@@ -105,10 +106,15 @@ The sandbox always mounts:
 
 ### System Prompt
 
-`persona/prompts/archie.prompt.md` defines Archie's identity and behaviour. It contains
-a "Critical Rules" section — these rules counter specific behavioural tendencies in the
-underlying AI harness (kiro-cli) and must be preserved across prompt rewrites. They are
-functional, not stylistic.
+The system prompt is assembled dynamically at session start by the container entrypoint.
+It concatenates brain-resident files in order: soul, BRAIN.md, memory, signals, tools,
+user profile. The seed versions live in `persona/seeds/` and are deployed to the brain
+on first `archie install`. After deployment, the brain versions are the live copies —
+Archie can evolve them over time.
+
+The soul (`_archie/soul.md` in the brain) contains a "Critical Rules" section — these
+rules counter specific behavioural tendencies in the underlying AI harness (kiro-cli)
+and must be preserved across prompt rewrites. They are functional, not stylistic.
 
 ### Skills
 

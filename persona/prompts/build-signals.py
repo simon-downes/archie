@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""AgentSpawn hook — inject learning signals into session context."""
+"""Build signals section for prompt assembly. Reads signals.yaml, outputs markdown."""
 
 import re
+import sys
 from pathlib import Path
 
-SIGNALS_PATH = Path.home() / ".archie" / "brain" / "_memory" / "signals.yaml"
 MAX_SIGNALS = 7
 PATTERN_THRESHOLD = 2
 
 
-def load_signals() -> list[dict]:
+def load_signals(path: Path) -> list[dict]:
     """Parse signals.yaml without PyYAML — each entry is a simple key: value block."""
-    if not SIGNALS_PATH.exists():
+    if not path.exists():
         return []
     signals: list[dict] = []
     current: dict = {}
-    for line in SIGNALS_PATH.read_text().splitlines():
+    for line in path.read_text().splitlines():
         if line.startswith("- "):
             if current:
                 signals.append(current)
@@ -41,7 +41,11 @@ def detect_patterns(signals: list[dict]) -> list[str]:
 
 
 def main() -> None:
-    signals = load_signals()
+    if len(sys.argv) < 2:
+        return
+
+    signals_path = Path(sys.argv[1])
+    signals = load_signals(signals_path)
     if not signals:
         return
 
@@ -49,12 +53,16 @@ def main() -> None:
     recent = recent[:MAX_SIGNALS]
     patterns = detect_patterns(signals)
 
-    lines = ["LEARNING CONTEXT:"]
+    if not recent and not patterns:
+        return
+
+    lines = ["# Signals", ""]
 
     if recent:
         lines.append("Recent corrections/failures:")
         for s in recent:
             lines.append(f"- {s.get('summary', '?')}")
+        lines.append("")
 
     if patterns:
         lines.append("Patterns:")

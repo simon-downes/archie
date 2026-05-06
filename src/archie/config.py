@@ -51,7 +51,6 @@ DEFAULT_CONFIG = {
         ["~/.archie/persona/skills", "~/.kiro/skills"],
         ["~/.archie/persona/prompts", "~/.kiro/prompts"],
         ["~/.archie/persona/guidance", "~/.kiro/steering"],
-        ["~/.archie/persona/hooks", "~/.kiro/hooks"],
         ["~/.kiro/sessions", "~/.kiro/sessions"],
         ["~/.agent-kit", "~/.agent-kit"],
         [_KIRO_DATA_DIR, "~/.local/share/kiro-cli"],
@@ -108,9 +107,16 @@ def install() -> None:
     # Template persona files with user info
     _template_persona()
 
-    # Create config if missing
-    if not CONFIG_PATH.exists():
+    # Create or merge config
+    if CONFIG_PATH.exists():
+        existing = load_config()
+        merged = _deep_merge(DEFAULT_CONFIG, existing)
+        _write_config(merged)
+    else:
         _write_config(DEFAULT_CONFIG)
+
+    # Deploy seeds to brain (only if not present)
+    _deploy_seeds()
 
 
 def load_config() -> dict:
@@ -294,6 +300,42 @@ def resolve_project() -> Path | None:
         return None
 
     return project_dir / relative.parts[0]
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge override into base. Override values take precedence."""
+    result = dict(base)
+    for key, val in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(val, dict):
+            result[key] = _deep_merge(result[key], val)
+        else:
+            result[key] = val
+    return result
+
+
+def _deploy_seeds() -> None:
+    """Copy seed files to brain if they don't already exist."""
+    from archie.docker import _read_ak_config, _resolve_brain_dir
+
+    brain_dir = _resolve_brain_dir()
+    if not brain_dir.exists():
+        return
+
+    seeds_dir = PERSONA_PATH / "seeds"
+    if not seeds_dir.exists():
+        return
+
+    ak_config = _read_ak_config()
+    agent_name = ak_config.get("agent", "archie")
+
+    agent_dir = brain_dir / f"_{agent_name}"
+    agent_dir.mkdir(parents=True, exist_ok=True)
+
+    for seed in seeds_dir.iterdir():
+        if seed.is_file():
+            dest = agent_dir / seed.name
+            if not dest.exists():
+                shutil.copy2(seed, dest)
 
 
 def _template_persona() -> None:
