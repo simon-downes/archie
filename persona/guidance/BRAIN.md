@@ -1,101 +1,91 @@
 # Brain
 
-Operational guidance for Archie's second brain — how to read, write, and manage
-brain content. This is always-loaded knowledge, not a triggered skill.
+Operational guidance for the second brain — how to read, write, and manage content.
 
 ## Location
 
-Default: `~/.archie/brain/`. Each context is an independent git repo.
+Default: `~/.archie/brain/`. A single git repo.
 
 ## Directory Layout
 
 ```
 brain/
-├── _raw/                    # Ingestion pipeline (outside contexts)
-│   ├── inbox/               # Items to process
-│   ├── processing/          # Currently being processed
-│   └── completed/           # Done
-├── _inbox/                  # Items for user to read (research output, reports)
-├── _outbox/                 # Items for user to act on (drafts, action items)
-├── _memory/                 # Conversation memory (device-local, no git)
-├── shared/                  # Personal/general context (git repo)
-│   ├── me/                  # Identity, preferences
-│   ├── contacts/            # People
-│   ├── projects/            # Active work
-│   ├── knowledge/           # Concepts, reference material
-│   ├── goals/               # Priorities, OKRs
-│   ├── journal/             # Logs
-│   ├── archive/             # Retired entities
-│   ├── index.yaml           # Entity lookup index
-│   └── brain.db             # Provenance tracking (gitignored)
-└── <work-context>/          # Company/org context (git repo, same structure)
+├── BRAIN.md              # Convention guide (structure, interaction patterns)
+├── _archie/              # Agent operational state
+│   ├── soul.md           # Personality (evolves)
+│   ├── memory.md         # Consolidated observations
+│   ├── signals.yaml      # Learning signals
+│   └── memory/           # Raw session memories
+├── _inbox/               # Ingestion staging
+├── simon/                # User's personal space
+│   ├── profile.md        # Structured profile
+│   ├── goals.md          # Current priorities
+│   ├── inbox/            # Things needing user's attention
+│   └── journal/          # Personal dated entries
+├── people/               # Relationships and contacts
+├── projects/             # Lightweight project context
+└── knowledge/            # Durable reference knowledge
 ```
-
-`_raw/`, `_inbox/`, `_outbox/`, `_memory/` sit outside contexts — device-local.
 
 ---
 
 ## Reading
 
-Primary command: `ak brain search` — searches index metadata, file content, and
-conversation memory in one call, returning ranked results.
+Primary command: `ak brain search` — searches index metadata and file content,
+returning ranked results.
 
 ```bash
-ak brain search "aurora"                    # search everything
-ak brain search "aurora" --context shared   # limit to one context
+ak brain search "aurora"                    # single term
+ak brain search "terraform" "module" "vpc"  # multiple terms (OR, ranked)
 ak brain search "aurora" --limit 5          # fewer results
 ```
 
 Results are ranked by match quality:
-1. **name** — query appears in entity name
-2. **tag** — query matches a tag
-3. **summary** — query appears in summary
-4. **content** — query found in file content (via rg)
-5. **memory** — query found in conversation memory
+- **+3** — term in filename/title
+- **+2** — term in tags
+- **+1** — term in body content
 
-Within the same weight, results are sorted by most recently modified.
+Multiple terms matching the same file boost its rank.
 
-Each result includes `path` (relative to brain root), `match` type, and metadata.
+Each result includes `path` (relative to brain root), `score`, `matches`, and `name`.
 Read a result with `cat ~/.archie/brain/{path}`.
 
-### Direct index/search when needed
-
-For browsing the full index or targeted lookups:
+### Direct index lookup
 
 ```bash
-ak brain index                              # list contexts
-ak brain index <context>                    # full index
-ak brain index <context> --type knowledge   # filter by type
-ak brain index <context> --slug <slug>      # lookup by slug
+ak brain index                        # full index
+ak brain index --type people          # filter by type
+ak brain index --slug alice           # lookup by slug
 ```
 
-For broad text search across content:
+### Record access (reference tracking)
 
 ```bash
-rg "<term>" ~/.archie/brain/<context>/ -t md -t yaml --glob '!.git' -l
-rg -i "<term>" ~/.archie/brain/ --glob '!.git' --glob '!_raw' -l
+ak brain ref <path>
 ```
+
+Non-critical — helps identify high-value vs stale entries over time.
 
 ---
 
 ## Writing
 
-### Determine target context
+### Determine location
 
-1. Extract key entities from the content (people, companies, projects, topics)
-2. Check indexes: `ak brain index <context>` across contexts
-3. Highest entity match count determines the context
-4. Default to `shared` when no context scores
-
-**Low-confidence routing:** route to best guess, create an inbox note flagging it.
+Follow the conventions in `BRAIN.md` at the brain root:
+- People → `people/<slug>.md`
+- Projects → `projects/<name>/` (with `context.md`, `journal/`, `decisions/`)
+- Knowledge → `knowledge/<domain>/<slug>.md`
+- Personal → `simon/journal/`, `simon/goals.md`
+- Agent state → `_archie/`
 
 ### Check for duplicates
 
-Before creating any entity, check the index:
+Before creating any entity:
 
 ```bash
-ak brain index <context> --slug <candidate-slug>
-ak brain index <context> --type <entity-type>
+ak brain search "<name>"
+ak brain index --slug <candidate-slug>
 ```
 
 **Match exists:** update the existing file — merge new information, don't overwrite.
@@ -104,21 +94,20 @@ ak brain index <context> --type <entity-type>
 ### Conflict detection
 
 If new data contradicts existing brain content, don't silently overwrite. Create
-an inbox note:
+a note in `simon/inbox/`:
 
 ```markdown
 ---
 type: conflict
-source: <source>
 entity: <path-to-entity>
 ---
 
 New data says <X>, existing brain says <Y>. Review and resolve.
 ```
 
-### Entity types and formats
+### Entity formats
 
-**Knowledge** — `<context>/knowledge/<slug>.md`
+**Knowledge** — `knowledge/<domain>/<slug>.md`
 ```markdown
 ---
 tags: [aws, aurora, databases]
@@ -130,132 +119,76 @@ summary: One-line description
 Content...
 ```
 
-Place flat in `knowledge/` unless a relevant subdirectory exists. Introduce a
-subdirectory only when 5+ related files cluster at the top level. When creating
-one, move related files and reindex.
-
-**Contacts** — `<context>/contacts/<slug>.yaml`
-```yaml
-name: Jane Smith
-summary: Engineering Manager at Tillo
-email: jane@example.com
-context: Met at platform team standup
-```
-
-**Projects** — `<context>/projects/<slug>/README.md`
+**People** — `people/<slug>.md`
 ```markdown
 ---
-name: Project Name
-summary: One-line description
-issues:
-  provider: jira
-  project: PLAT
-slack: true
+name: Jane Smith
+summary: Engineering Manager at Tillo
+tags: [tillo, engineering]
 ---
-
-# Project Name
 
 Context and notes...
 ```
 
-**Goals** — `<context>/goals/<slug>.yaml`
-```yaml
-name: Ship Archie v1
-summary: Complete brain read/write and ingestion pipeline
-status: in-progress
-target: 2026-Q2
+**Projects** — `projects/<name>/context.md`
+```markdown
+---
+name: Project Name
+summary: One-line description
+---
+
+Current focus, status, key links...
 ```
 
-**Journal** — `<context>/journal/<date>.md` (no index entry needed)
+**Journal** — `simon/journal/<date>.md` or `projects/<name>/journal/<date>.md`
 
-**Inbox notes** — `<context>/inbox/<slug>.md` with frontmatter
+Use `[[wikilinks]]` for associative links: `[[people/jane]]`, `[[projects/tillo]]`.
 
 ### Index and commit
 
 After writing:
 
 ```bash
-ak brain reindex <context>
-ak brain commit <context> -m "brain: <description>" \
-  --paths <file1> --paths <file2> --paths index.yaml
+ak brain reindex
+ak brain commit "brain: <description>" --paths <file1> --paths <file2> --paths index.yaml
 ```
 
-Always include `index.yaml` if you ran reindex. Only commit files you wrote —
-prevents sweeping up another agent's uncommitted work.
-
-If writes span multiple contexts, commit each independently.
-
-### Commit conventions
-
-- Ingestion: `brain: ingest <source-filename>`
-- Manual writes: `brain: <brief description>`
+Always include `index.yaml` if you ran reindex.
 
 ---
 
 ## CLI Reference
 
-### `ak brain search <query> [--context <name>] [--limit N]`
-Search across index metadata, file content, and memory. Returns ranked results.
+### `ak brain search <term> [<term>...] [--limit N]`
+Search across index metadata and file content. Returns ranked results.
 
-### `ak brain index [context]`
-Query the brain index. Without context, lists available contexts.
+### `ak brain index [--type <type>] [--slug <slug>]`
+Query the brain index.
 
-### `ak brain reindex <context>`
-Rebuild `index.yaml` from filesystem. Acquires a file lock for concurrent safety.
+### `ak brain reindex`
+Rebuild `index.yaml` from filesystem.
 
-### `ak brain commit <context> -m <message> [--paths <file> ...]`
-Stage and commit. Use `--paths` for concurrent safety.
+### `ak brain commit <message> [--paths <file> ...]`
+Stage and commit.
 
-### `ak brain status [context]`
-Raw pipeline state and git changes per context.
+### `ak brain ref <path>`
+Record an access for reference tracking.
 
-### `ak brain validate [context]`
-Check structure and index integrity.
+### `ak brain refs [--top N] [--stale --since Nd]`
+Query reference tracking data.
+
+### `ak brain status`
+Brain directory info and git status.
 
 ### `ak brain project [name]`
-Get project config. Infers from cwd if no name given.
-
----
-
-## Index Format
-
-```yaml
-contacts:
-  jane-smith:
-    name: Jane Smith
-    summary: Engineering Manager at Tillo
-    path: contacts/jane-smith.yaml
-knowledge:
-  aurora-failover:
-    name: Aurora PostgreSQL Failover
-    summary: Failover behaviour and gotchas
-    path: knowledge/aws/aurora-failover.md
-```
-
-Keyed by entity type, then slug. Slugs are stable identifiers — paths can change.
-
----
-
-## Provenance
-
-Tracked in `brain.db` (SQLite, gitignored) per context:
-
-```sql
-CREATE TABLE IF NOT EXISTS provenance (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source_file TEXT NOT NULL,
-    ingested_at TEXT NOT NULL,
-    entities_created TEXT,  -- JSON array of paths
-    entities_updated TEXT   -- JSON array of paths
-);
-```
+Get project info from the brain.
 
 ---
 
 ## Key Rules
 
-- Each context is a separate git repo — commit independently
+- Single git repo — one commit covers all changes
 - `brain.db` is gitignored — operational metadata, not knowledge
-- `_raw/`, `_inbox/`, `_outbox/`, `_memory/` sit outside context repos
-- Slugs are stable identifiers; paths can change
-- Run `ak brain reindex` after moving files
+- `_inbox/` files = ready for processing, subdirs = staging
+- Use `[[wikilinks]]` for links between entries
+- Run `ak brain reindex` after creating/moving files
