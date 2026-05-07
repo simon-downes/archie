@@ -46,8 +46,24 @@ from pathlib import Path
 
 KIRO_DB = Path.home() / ".local" / "share" / "kiro-cli" / "data.sqlite3"
 SESSIONS_DIR = Path.home() / ".kiro" / "sessions" / "cli"
-BRAIN_DB = Path.home() / ".archie" / "brain" / "shared" / "brain.db"
 AK_CONFIG = Path.home() / ".agent-kit" / "config.yaml"
+
+
+def _resolve_brain_dir() -> Path:
+    """Resolve brain directory from agent-kit config."""
+    if AK_CONFIG.exists():
+        try:
+            import yaml
+
+            with AK_CONFIG.open() as f:
+                config = yaml.safe_load(f) or {}
+            return Path(config.get("brain", {}).get("dir", "~/.archie/brain")).expanduser()
+        except Exception:
+            pass
+    return Path.home() / ".archie" / "brain"
+
+
+BRAIN_DB = _resolve_brain_dir() / "brain.db"
 
 
 def _project_dir_name() -> str:
