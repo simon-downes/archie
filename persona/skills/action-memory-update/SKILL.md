@@ -32,22 +32,11 @@ conversation via the brain guidance).
 ## 1. Gather conversations
 
 ```bash
-python3 ~/.archie/persona/scripts/memory-prep.py > /tmp/memory-payload.json
+python3 ~/.kiro/skills/action-memory-update/scripts/memory-prep.py > /tmp/memory-payload.json
 ```
 
-Check what's available:
-```bash
-cat /tmp/memory-payload.json | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-print(f'{len(data[\"conversations\"])} conversations, {len(data[\"signals\"])} signals')
-for c in data['conversations']:
-    p = c['project'] or '(general)'
-    print(f'  {c[\"date\"]} {p:20s} {len(c[\"turns\"]):>3} turns')
-"
-```
-
-If no conversations, skip to signals or finish.
+The script prints a summary to stderr showing conversation count and breakdown by
+date/project/turns. If no conversations are found, stop here.
 
 ## 2. Summarise into memory files
 
@@ -97,19 +86,22 @@ CURRENT STATUS: All features implemented. Memory pipeline operational.
 After all conversations are processed:
 
 ```bash
-python3 ~/.archie/persona/scripts/memory-prep.py \
+python3 ~/.kiro/skills/action-memory-update/scripts/memory-prep.py \
   --set-watermark <watermark_from_payload>
 ```
 
-## 4. Process signals
+## 4. Detect and record signals
 
-The payload includes a `signals` array with mechanically-detected corrections,
-failures, and successes. Review each and write meaningful ones to the signals file.
+While summarising each conversation, identify learning signals — moments where:
+- The user corrected a mistake or misunderstanding
+- An approach failed and required a different strategy
+- A tool or API behaved unexpectedly
+- An assumption proved wrong
 
-For each signal worth keeping:
-1. Read the signal's `message` field and surrounding context
-2. Write a concise, actionable summary (not the raw user message)
-3. Assign a category
+For each signal worth recording:
+1. Determine the type: `correction`, `failure`, or `pattern` (recurring issue)
+2. Write a concise, actionable summary — what went wrong and what the correct approach is
+3. Assign a category (api-integration, configuration, implementation, architecture, behaviour, etc.)
 
 Append to `_archie/signals.yaml`:
 
@@ -121,10 +113,15 @@ Append to `_archie/signals.yaml`:
   summary: "Jira scoped tokens use Basic auth at api.atlassian.com, not Bearer"
 ```
 
-Skip signals that are:
-- False positives
-- Trivial (typo corrections, minor clarifications)
-- Duplicates of existing signals
+**What makes a good signal:**
+- Specific and actionable (not "made an error")
+- Captures the correct approach, not just the failure
+- Would prevent the same mistake in future sessions
+
+**Skip:**
+- Trivial corrections (typos, minor naming preferences)
+- One-off debugging steps that aren't generalisable
+- Signals already present in the file
 
 ## 5. Commit
 
