@@ -12,12 +12,12 @@ brain/
 │   ├── soul.md           # Live personality (evolves)
 │   ├── memory.md         # Consolidated observations (always-loaded)
 │   ├── signals.yaml      # Learning signals
-│   └── memory/           # Raw session memories
-├── _inbox/               # Ingestion staging
+│   └── memory/           # Session memories (indexed, searchable)
+├── _raw/                 # Ingestion staging (files awaiting processing)
+├── _inbox/               # User attention queue (needs human review)
 ├── simon/                # User's personal space
 │   ├── profile.md        # Structured profile (always-loaded)
 │   ├── goals.md          # Current priorities
-│   ├── inbox/            # Things needing attention
 │   └── journal/          # Personal dated entries
 ├── people/               # Relationships and contacts
 ├── projects/             # Lightweight project context

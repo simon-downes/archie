@@ -327,7 +327,7 @@ ak google drive fetch <file-id> --format pdf
 
 **When to use:** Reading emails for context, checking calendar for scheduling, fetching
 documents and meeting transcripts for brain ingestion. Use `--to-inbox` to send files
-directly to the brain raw inbox for processing.
+directly to the brain raw ingestion directory for processing.
 
 ### ak slack — Slack Integration
 
