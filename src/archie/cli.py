@@ -45,6 +45,20 @@ from archie.output import (
 BUILTIN_COMMANDS = {"install", "status", "build", "ls", "rm"}
 
 
+def _safe_remove_session(session_dir: Path) -> None:
+    """Remove a session directory, with safety check that it's under SESSIONS_DIR."""
+    try:
+        session_dir.resolve().relative_to(SESSIONS_DIR.resolve())
+    except ValueError:
+        print_error(f"Refusing to delete {session_dir} — not under {SESSIONS_DIR}")
+        sys.exit(1)
+    shutil.rmtree(session_dir)
+    # Clean up empty parent
+    parent = session_dir.parent
+    if parent.exists() and parent != SESSIONS_DIR and not any(parent.iterdir()):
+        parent.rmdir()
+
+
 class ArchieCLI(click.Group):
     """Click group with install guard and dynamic tool commands."""
 
@@ -306,11 +320,7 @@ def _remove_one_session(name: str, force: bool) -> None:
         if reply.strip().lower() != "y":
             return
 
-    shutil.rmtree(session_dir)
-    # Clean up empty parent
-    parent = session_dir.parent
-    if parent.exists() and parent != SESSIONS_DIR and not any(parent.iterdir()):
-        parent.rmdir()
+    _safe_remove_session(session_dir)
     print_success(f"Removed session [bright_blue]{session_name}[/bright_blue]")
 
 
@@ -342,10 +352,7 @@ def _remove_all_sessions(force: bool) -> None:
             if reply.strip().lower() != "y":
                 continue
 
-        shutil.rmtree(session_dir)
-        parent = session_dir.parent
-        if parent.exists() and parent != SESSIONS_DIR and not any(parent.iterdir()):
-            parent.rmdir()
+        _safe_remove_session(session_dir)
         print_success(f"Removed [bright_blue]{proj_name}/{sess_name}[/bright_blue]")
 
 
@@ -365,10 +372,7 @@ def _remove_clean_sessions() -> None:
     for s in inactive_clean:
         session_dir = SESSIONS_DIR / s["project"] / s["session"]
         if session_dir.exists():
-            shutil.rmtree(session_dir)
-            parent = session_dir.parent
-            if parent.exists() and parent != SESSIONS_DIR and not any(parent.iterdir()):
-                parent.rmdir()
+            _safe_remove_session(session_dir)
             print_success(f"Removed [bright_blue]{s['project']}/{s['session']}[/bright_blue]")
 
 
