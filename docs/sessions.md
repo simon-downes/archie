@@ -9,7 +9,7 @@ Run `archie` from inside a project directory (a subdirectory of your configured
 `project_dir`).
 
 - Your project directory is mounted read-write
-- The brain is mounted read-only — available as context, not for editing
+- The brain is mounted read-write
 - Container is named `archie-shell-<project>` (e.g. `archie-shell-my-app`)
 - Only one session per project at a time — starting a second prompts to start a
   general session instead
@@ -43,11 +43,7 @@ there's no conflict.
 
 ## Archie Development
 
-Running `archie` from inside the `archie` project is a project session with one
-exception: the brain is mounted read-write instead of read-only.
-
-This is because improving Archie often involves brain operations — ingestion, curation,
-skill development — that require write access.
+Running `archie` from inside the `archie` project is a standard project session.
 
 ## Shell Sessions
 

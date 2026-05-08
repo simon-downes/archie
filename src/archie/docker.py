@@ -195,13 +195,11 @@ def run_container(command: list[str], tool_name: str = "shell", session: str | N
     if project:
         args.extend(["-v", f"{project}:{container_project}", "-w", container_project])
 
-    # Mount brain if it exists
+    # Mount brain if it exists (always read-write)
     brain_dir = _resolve_brain_dir()
     if brain_dir and brain_dir.exists():
         container_brain = str(brain_dir).replace(host_home, container_home)
-        # Read-write for general sessions and archie project, read-only for other projects
-        ro = ":ro" if project and project.name != "archie" else ""
-        args.extend(["-v", f"{brain_dir}:{container_brain}{ro}"])
+        args.extend(["-v", f"{brain_dir}:{container_brain}"])
 
     if sys.stdin.isatty():
         args.append("-it")
