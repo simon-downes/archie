@@ -94,26 +94,26 @@ def has_git(path: Path) -> bool:
     return (path / ".git").is_dir()
 
 
-def _get_remote_url(repo: Path) -> str:
-    """Get origin remote URL from a local repo."""
+def _get_remote_url(repo: Path) -> str | None:
+    """Get origin remote URL from a local repo. Returns None if no remote."""
     result = subprocess.run(
         ["git", "-C", str(repo), "remote", "get-url", "origin"],
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
-        from archie.output import print_error
-
-        print_error(f"No remote 'origin' in {repo.name}")
-        raise SystemExit(1)
+        return None
     return result.stdout.strip()
 
 
 def _has_cloneable_repos(project: Path) -> bool:
-    """Check if a project has any git repos (itself or immediate children)."""
-    if has_git(project):
+    """Check if a project has any git repos with remotes (itself or immediate children)."""
+    if has_git(project) and _get_remote_url(project):
         return True
-    return any(child.is_dir() and (child / ".git").is_dir() for child in project.iterdir())
+    return any(
+        child.is_dir() and (child / ".git").is_dir() and _get_remote_url(child)
+        for child in project.iterdir()
+    )
 
 
 def create_session_clone(project: Path, session_name: str) -> Path:
@@ -125,6 +125,11 @@ def create_session_clone(project: Path, session_name: str) -> Path:
     if has_git(project):
         # Clone top-level repo (creates session_dir)
         remote = _get_remote_url(project)
+        if not remote:
+            from archie.output import print_error
+
+            print_error(f"No remote 'origin' in {project.name} — cannot clone")
+            raise SystemExit(1)
         result = subprocess.run(
             ["git", "clone", "--single-branch", remote, str(session_dir)],
             capture_output=True,
@@ -139,10 +144,12 @@ def create_session_clone(project: Path, session_name: str) -> Path:
         # Project dir isn't a git repo — just create the session dir
         session_dir.mkdir(parents=True, exist_ok=True)
 
-    # Clone sub-repos (immediate subdirectories with .git/)
+    # Clone sub-repos (immediate subdirectories with .git/ and a remote)
     for child in sorted(project.iterdir()):
         if child.is_dir() and (child / ".git").is_dir():
             sub_remote = _get_remote_url(child)
+            if not sub_remote:
+                continue  # skip repos without a remote
             sub_dest = session_dir / child.name
             result = subprocess.run(
                 ["git", "clone", "--single-branch", sub_remote, str(sub_dest)],
