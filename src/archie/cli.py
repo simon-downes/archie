@@ -22,7 +22,6 @@ from archie.docker import (
     resolve_session,
     run_container,
     session_status,
-    validate_session_name,
 )
 from archie.output import (
     C_CMD,
@@ -172,7 +171,6 @@ def _run_session(*, name: str | None, use_shell: bool, prompt: str | None) -> No
 
     # Named session
     if name:
-        validate_session_name(name)
         proj, session_name, existing_dir = resolve_session(name, project)
 
         # Check if container already running
@@ -184,11 +182,16 @@ def _run_session(*, name: str | None, use_shell: bool, prompt: str | None) -> No
         # Create or reuse session directory
         session_dir = existing_dir
         if not session_dir:
-            if proj and _has_git(proj):
+            if proj and proj.exists() and _has_git(proj):
                 print_info(f"Creating session [bright_blue]{session_name}[/bright_blue]...")
                 session_dir = create_session_clone(proj, session_name)
+            elif proj and proj.exists():
+                # Project exists but no git — just create empty session dir
+                session_dir = SESSIONS_DIR / proj.name / session_name
+                session_dir.mkdir(parents=True, exist_ok=True)
             else:
-                # General named session — empty working dir
+                # No valid project — general named session
+                proj = None
                 session_dir = SESSIONS_DIR / "general" / session_name
                 session_dir.mkdir(parents=True, exist_ok=True)
         else:

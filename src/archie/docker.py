@@ -82,7 +82,7 @@ def _hash_suffix() -> str:
 
 def validate_session_name(name: str) -> None:
     """Reject session names that could escape the session directory."""
-    if not name or ".." in name or name.startswith("/") or name.startswith("."):
+    if not name or ".." in name or "/" in name or name.startswith("."):
         from archie.output import print_error
 
         print_error(f"Invalid session name: {name!r}")
@@ -111,6 +111,8 @@ def _get_remote_url(repo: Path) -> str:
 
 def create_session_clone(project: Path, session_name: str) -> Path:
     """Clone project and sub-repos into a session directory."""
+    import shutil
+
     session_dir = SESSIONS_DIR / project.name / session_name
 
     # Clone top-level repo
@@ -140,6 +142,7 @@ def create_session_clone(project: Path, session_name: str) -> Path:
                 from archie.output import print_error
 
                 print_error(f"Failed to clone {child.name}: {result.stderr.strip()}")
+                shutil.rmtree(session_dir, ignore_errors=True)
                 raise SystemExit(1)
 
     return session_dir
@@ -157,6 +160,7 @@ def resolve_session(name: str, project: Path | None) -> tuple[Path | None, str, 
     # Qualified name: "project/session"
     if "/" in name:
         proj_name, session_name = name.split("/", 1)
+        validate_session_name(proj_name)
         validate_session_name(session_name)
         proj_path = project_dir / proj_name
         session_dir = SESSIONS_DIR / proj_name / session_name
@@ -274,8 +278,8 @@ def list_sessions() -> list[dict]:
             for sess_dir in sorted(parent.iterdir()):
                 if not sess_dir.is_dir():
                     continue
-                proj = None if parent.name == "general" else Path(parent.name)
-                cn = container_name_for_session(proj, sess_dir.name)
+                proj_path = None if parent.name == "general" else parent
+                cn = container_name_for_session(proj_path, sess_dir.name)
                 known_named[cn] = (parent.name, sess_dir.name, sess_dir)
 
     # Running containers
