@@ -117,15 +117,16 @@ def _print_not_ready(s) -> None:
 # --- Main command ---
 
 
-@click.group(invoke_without_command=True, cls=ArchieCLI)
+@click.group(
+    invoke_without_command=True,
+    cls=ArchieCLI,
+    context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
+)
 @click.option("--plain", is_flag=True, help="Disable colours and formatting")
 @click.option("--name", default=None, help="Named session (isolated working directory)")
 @click.option("--shell", "use_shell", is_flag=True, help="Run bash instead of kiro-cli")
-@click.argument("prompt", required=False)
 @click.pass_context
-def main(
-    ctx: click.Context, plain: bool, name: str | None, use_shell: bool, prompt: str | None
-) -> None:
+def main(ctx: click.Context, plain: bool, name: str | None, use_shell: bool) -> None:
     """Archie — personal AI platform."""
     if plain:
         from archie.output import console, console_err
@@ -143,6 +144,9 @@ def main(
     if not s.ready:
         _print_not_ready(s)
         sys.exit(1)
+
+    # Remaining args are the prompt
+    prompt = " ".join(ctx.args) if ctx.args else None
 
     # Read piped input if no prompt and not a TTY
     if not prompt and not sys.stdin.isatty():
@@ -167,7 +171,7 @@ def _run_session(*, name: str | None, use_shell: bool, prompt: str | None) -> No
     else:
         command = ["kiro-cli", "chat", "--agent", "archie"]
         if prompt:
-            command.extend(["--prompt", prompt])
+            command.append(prompt)
 
     # Named session
     if name:
