@@ -1,25 +1,81 @@
-# Archie — Session Working Directories
+# Archie — Session Working Directories & CLI Redesign
 
 ## Objective
 
-Evolve the named session model to use isolated working directories with cloned repos.
-Enable multiple concurrent unnamed project sessions. Provide a host-mounted working
-directory for general sessions (solving the data-passing problem). Replace worktree
-backing with full clones.
+Redesign the CLI interface and session model. Named sessions get isolated working
+directories with cloned repos. Multiple unnamed project sessions allowed. General
+sessions get host-mounted working directories. Background mode deferred to a future plan.
 
-## Background
+## CLI Interface
 
-Plan 006 implemented named sessions with single-repo worktree backing. This plan
-replaces worktrees with clones to handle multi-repo projects and simplify the model.
+```
+archie                            # interactive unnamed session
+archie "do xyz"                   # prompt passed to kiro-cli, then interactive chat
+archie --name foo                 # interactive named session
+archie --name foo "do xyz"        # prompt in named session, then interactive chat
+archie --shell                    # bash in unnamed container
+archie --shell "ls -la"           # run command in unnamed container, exit
+archie --shell --name foo         # bash in named session's working dir
+archie --shell --name foo "ls"    # run command in named session's working dir, exit
+archie ls                         # list sessions and statuses
+archie rm                         # remove inactive sessions with no uncommitted/unpushed changes
+archie rm <name>                  # remove specific session
+archie rm --all                   # remove all inactive sessions (prompts for dirty ones)
+archie install                    # deploy persona and config
+archie build                      # build sandbox image
+archie status                     # environment readiness check
+```
+
+### Flags
+
+- `--name <name>` — creates/resumes a named session (triggers clone for project sessions)
+- `--shell` — run bash instead of kiro-cli. Prompt argument becomes a bash command.
+- `--bg` — deferred to future plan (background/non-interactive mode)
+
+### Prompt handling
+
+- Positional argument: short prompt string (quoted)
+- Piped stdin: if not a TTY and no positional prompt, read stdin as the prompt
+- Prompt passed to kiro-cli which starts a chat session with that as the first message
+
+### Constraints
+
+- `--bg` requires a prompt (deferred)
+- `--bg` on a project session requires `--name` (deferred)
+- `--shell --bg` is invalid (deferred)
+
+### Subcommands
+
+- `ls` — list all sessions (active containers + inactive named session dirs)
+- `rm` — remove session working directories
+- `install`, `build`, `status` — unchanged
 
 ## Session Model
 
 | Session type | Working directory | Container mount | Lifecycle |
 |---|---|---|---|
-| Unnamed project | None (project dir mounted directly) | `~/dev/<project>` → same path in container | Container removed on exit |
-| Named project | `~/.archie/sessions/<project>/<name>/` | Mounted at container's project path (e.g. `~/dev/<project>`) | Persists until `--rm` |
-| Unnamed general | `~/.archie/sessions/general/<hash>/` | Mounted at a fixed path (e.g. `~/workspace/`) | Removed on exit |
-| Named general | `~/.archie/sessions/general/<name>/` | Mounted at a fixed path (e.g. `~/workspace/`) | Persists until `--rm` |
+| Unnamed project | None | Project dir mounted at container project path | Container removed on exit |
+| Named project | `~/.archie/sessions/<project>/<name>/` | Session dir mounted at container project path | Persists until `rm` |
+| Unnamed general | `~/.archie/sessions/general/<hash>/` | Mounted at `~/workspace/` in container | Removed on exit |
+| Named general | `~/.archie/sessions/general/<name>/` | Mounted at `~/workspace/` in container | Persists until `rm` |
+
+### Multiple unnamed project sessions
+
+All unnamed project sessions get a hash suffix in the container name:
+`archie-shell-<project>-<hash>`. No collision check, no "start general instead?" prompt.
+Each mounts the same project directory — deconflicting is the user's responsibility.
+
+### Named session isolation
+
+`--name` triggers clone-based isolation for project sessions:
+- Clone project repo + immediate sub-repos into session directory
+- Session directory mounted at the container's project path
+- Agent sees identical paths to a normal session — no resolution changes needed
+
+### General session working directories
+
+All general sessions get a host-mounted working directory at `~/workspace/` in the
+container. Solves the data-passing problem (files written there are on the host).
 
 ## Design Decisions
 
@@ -28,18 +84,17 @@ replaces worktrees with clones to handle multi-repo projects and simplify the mo
 - `git clone --single-branch <remote-url>` — full history, default branch only
 - Remote URL read from the existing local repo (`git remote get-url origin`)
 - No branching at clone time — agent/skill creates branches as needed
-- Additional branches fetched on demand
+- Additional branches fetched on demand by the agent
 
 ### Sub-repo detection
 
-- Scan the project directory one level deep for immediate subdirectories containing `.git/`
+- Scan the project directory for immediate subdirectories containing `.git/`
 - Clone each sub-repo into the same relative path within the session directory
-- Sub-repos that are gitignored in the parent (e.g. `agent-kit` in archie) remain
-  gitignored in the clone — no interference
+- Sub-repos that are gitignored in the parent remain gitignored in the clone
 
-### Working directory layout
+### Working directory layout (named project session)
 
-The session directory mirrors the host project structure:
+Mirrors the host project structure:
 
 ```
 ~/.archie/sessions/archie/fix-auth/
@@ -62,94 +117,59 @@ Host:      ~/.archie/sessions/archie/fix-auth/
 Container: ~/dev/archie/
 ```
 
-This means `ak project`, brain resolution, and all tools work identically to an
-unnamed session. No special resolution logic needed inside the container.
+`ak project`, brain resolution, and all tools work identically. No special resolution
+logic needed inside the container.
 
-### Multiple unnamed project sessions
+### Session resume
 
-Remove the single-session restriction. Container name includes a hash suffix:
-`archie-shell-<project>-<hash>`. No prompt to switch to general. Each mounts the
-same project directory — deconflicting is the user's responsibility.
+If the session directory already exists, skip cloning — just mount and launch.
+No automatic fetch/pull. Agent handles sync if needed.
 
-### General session working directories
+### Cleanup (`archie rm`)
 
-All general sessions get a host-mounted working directory:
-- Named: `~/.archie/sessions/general/<name>/` — persists
-- Unnamed: `~/.archie/sessions/general/<hash>/` — removed on exit
+- `archie rm` (no args) — removes all inactive session dirs that are clean (no
+  uncommitted changes, no unpushed commits across all repos in the session)
+- `archie rm <name>` — removes specific session. Prompts if dirty, errors if running.
+- `archie rm --all` — removes all inactive sessions. Prompts for each dirty one.
+- `-f` flag forces removal without prompts.
+- Non-interactive: refuses dirty removal unless `-f`.
 
-Mounted at a fixed container path (e.g. `~/workspace/`). Solves the data-passing
-problem — files written there are accessible on the host.
+### Status (`archie ls`)
 
-### Cleanup
+Shows all sessions:
+- Running containers (active — named and unnamed)
+- Session directories with no container (inactive named sessions)
+- For sessions with git repos: ahead/behind, modified count (aggregated across all repos)
+- For sessions without git: file count and total size
 
-- Named sessions: `archie session --rm <name>` removes the directory
-- Unnamed general sessions: CLI removes the directory after container exits
-- Orphaned dirs (crash): `archie status` shows them, `archie session --rm` cleans up
-
-### What changes from plan 006
-
-- **Remove**: worktree creation, `.git` mount logic, worktree status checks,
-  `ak project` worktree resolution, branch creation
-- **Keep**: session command, name resolution (project-scoped, qualified, search),
-  status display, cleanup, name validation
-- **Change**: mount strategy (clone dir at project path instead of worktree + .git),
-  session creation (clone instead of worktree add)
-- **Add**: sub-repo detection and cloning, general session working dirs, multiple
-  unnamed project sessions, unnamed dir cleanup
-
-## Requirements
-
-### Named Project Sessions
-
-- `archie session <name>` creates or resumes a named project session
-  - AC: Clones project repo into `~/.archie/sessions/<project>/<name>/`
-  - AC: Detects and clones immediate sub-repos into relative paths
-  - AC: Clone uses `git clone --single-branch <remote-url>`
-  - AC: Remote URL read from existing local repo
-  - AC: If session directory exists, reattaches (no re-clone)
-  - AC: Session directory mounted at container's project path
-  - AC: No automatic branching — agent handles this
-
-### Multiple Unnamed Project Sessions
-
-- `archie` allows multiple concurrent project sessions
-  - AC: Container name includes hash: `archie-shell-<project>-<hash>`
-  - AC: No "already running" prompt — just launches
-  - AC: Each mounts the project directory directly (shared)
-
-### General Session Working Directories
-
-- All general sessions get a host-mounted working directory
-  - AC: Named: `~/.archie/sessions/general/<name>/` — persists
-  - AC: Unnamed: `~/.archie/sessions/general/<hash>/` — removed after exit
-  - AC: Mounted at `~/workspace/` in the container
-  - AC: Container `-w` set to the workspace mount
-
-### Session Resolution
-
-- Same as plan 006:
-  - AC: In a project dir → scoped to that project
-  - AC: Outside any project → search all sessions, error if ambiguous
-  - AC: Qualified name (`project/session`) works from anywhere
-
-### Session Cleanup
-
-- `archie session --rm <name>` removes a named session
-  - AC: Cannot remove if container is running (error)
-  - AC: Prompts if repos have uncommitted/unpushed changes
-  - AC: `-f` forces removal
-  - AC: Removes the entire session directory
-
-### Status
-
-- `archie status` shows all sessions
-  - AC: Running containers (active — named and unnamed)
-  - AC: Session directories with no container (inactive named sessions)
-  - AC: Git state for session repos: ahead/behind, modified count
+Example:
+```
+Sessions:
+  archie  fix-auth   ● running    3 ahead, clean
+  archie  refactor   ○ inactive   1 ahead, 2 modified
+  archie  (unnamed)  ● running    —
+  general research   ○ inactive   12 files, 48KB
+```
 
 ## Technical Design
 
-### Clone Creation
+### Click structure
+
+```python
+@click.group(cls=ArchieCLI, invoke_without_command=True)
+@click.option("--name", default=None, help="Named session (isolated working directory)")
+@click.option("--shell", is_flag=True, help="Run bash instead of kiro-cli")
+@click.argument("prompt", required=False)
+@click.pass_context
+def main(ctx, name, shell, prompt):
+    if ctx.invoked_subcommand is None:
+        # Read piped input if no prompt and not a TTY
+        if not prompt and not sys.stdin.isatty():
+            prompt = sys.stdin.read().strip() or None
+        _run_session(name=name, shell=shell, prompt=prompt)
+```
+
+### Clone creation
 
 ```python
 def _create_session_clone(project: Path, session_name: str) -> Path:
@@ -191,88 +211,144 @@ def _get_remote_url(repo: Path) -> str:
     return result.stdout.strip()
 ```
 
-### Container Mount (named project session)
+### Container mount (named project session)
 
 ```python
-# Session dir mounted at the container's project path
 container_project = str(project).replace(host_home, container_home)
 args.extend(["-v", f"{session_dir}:{container_project}", "-w", container_project])
 ```
 
-### Container Mount (general session)
+### Container mount (general session)
 
 ```python
 container_workspace = f"{container_home}/workspace"
 args.extend(["-v", f"{session_dir}:{container_workspace}", "-w", container_workspace])
 ```
 
-### Multiple Unnamed Project Sessions
+### Container naming
+
+- Unnamed project: `archie-shell-<project>-<hash>`
+- Named project: `archie-shell-<project>-<name>`
+- Unnamed general: `archie-general-<hash>`
+- Named general: `archie-general-<name>`
+
+### Session status (multi-repo)
 
 ```python
-# Always add hash suffix for unnamed project sessions
-import hashlib, time
-suffix = hashlib.sha1(str(time.time_ns()).encode()).hexdigest()[:5]
-container_name = f"{CONTAINER_PREFIX}shell-{_sanitize_name(project.name)}-{suffix}"
-# No collision check needed — hash is unique
+def session_status(session_dir: Path) -> str:
+    """Aggregate git status across all repos in a session directory."""
+    parts = []
+    total_ahead = 0
+    total_modified = 0
+
+    # Find all git repos in the session dir
+    repos = [session_dir] if (session_dir / ".git").is_dir() else []
+    for child in sorted(session_dir.iterdir()):
+        if child.is_dir() and (child / ".git").is_dir():
+            repos.append(child)
+
+    for repo in repos:
+        # Ahead count
+        result = subprocess.run(
+            ["git", "-C", str(repo), "rev-list", "@{upstream}..HEAD"],
+            capture_output=True, text=True,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            total_ahead += len(result.stdout.strip().splitlines())
+
+        # Modified files
+        result = subprocess.run(
+            ["git", "-C", str(repo), "status", "--porcelain"],
+            capture_output=True, text=True,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            total_modified += len(result.stdout.strip().splitlines())
+
+    if total_ahead:
+        parts.append(f"{total_ahead} ahead")
+    if total_modified:
+        parts.append(f"{total_modified} modified")
+    return ", ".join(parts) if parts else "clean"
 ```
 
-### Unnamed General Session Cleanup
+### Unnamed general session cleanup
 
 ```python
-# After container exits
+# After container exits, clean up transient working dir
 returncode = _docker(*args).returncode
-if not session and session_dir and session_dir.exists():
-    shutil.rmtree(session_dir)
+if not named and session_dir and session_dir.exists():
+    shutil.rmtree(session_dir, ignore_errors=True)
 return returncode
 ```
 
+## What changes from plan 006
+
+- **Remove**: worktree creation, `.git` file mount logic, worktree status checks,
+  `ak project` worktree resolution, `archie session` subcommand, `--session` flag
+- **Keep**: session name validation, container naming logic, status display concept
+- **Replace**: worktree mount → clone mount, `session` subcommand → `--name` flag
+- **Add**: clone creation, sub-repo detection, general working dirs, `archie ls`,
+  `archie rm`, prompt argument, `--shell` flag, piped input, multi-repo status
+
 ## Milestones
 
-1. **Multiple unnamed project sessions + general working dirs**
+1. **CLI restructure + multiple unnamed sessions**
    Approach:
-   - Remove single-session restriction: all unnamed project sessions get a hash suffix
-     in the container name. Remove the "Start a general session instead?" prompt entirely.
-   - General session working dir creation lives in `run_container()`: when no project and
-     no worktree, create `~/.archie/sessions/general/<suffix>/` and mount it. The dir path
-     is stored in a local variable and passed to cleanup after the container exits.
-   - Cleanup: after `_docker(*args)` returns, if the session was unnamed general,
-     `shutil.rmtree(session_dir)`. Wrap in try/except (dir may already be gone).
-   Deliverable: Multiple unnamed project sessions coexist. General sessions have writable host dir.
-   Verify: Launch two unnamed project sessions simultaneously — both start without error.
-   Write a file in a general session, confirm visible on host at `~/.archie/sessions/general/<hash>/`.
-   Exit the general session, confirm the directory is removed.
+   - Restructure main command: add `--name`, `--shell`, positional `prompt` argument
+   - Remove `session` subcommand, `--session` flag
+   - Add `ls` and `rm` subcommands
+   - All unnamed project sessions get hash suffix — remove collision check and
+     "start general instead?" prompt entirely
+   - Piped stdin detection: if not TTY and no prompt arg, read stdin
+   Deliverable: New CLI interface works for unnamed sessions (current behaviour preserved
+   with new flags). `archie ls` shows running containers.
+   Verify: `archie` launches interactive session. `archie "hello"` passes prompt.
+   `archie --shell "ls"` runs bash command. Two unnamed project sessions coexist.
+   `archie ls` shows both.
 
-2. **Named session clone creation**
+2. **General session working directories**
    Approach:
-   - Replace worktree creation with clone logic in `docker.py`
-   - Detect sub-repos (one level deep, immediate subdirs with `.git/`)
-   - Clone top-level + sub-repos using `git clone --single-branch <remote>`
+   - Create `~/.archie/sessions/general/<suffix>/` for all general sessions
+   - Mount at `~/workspace/` in container, set as `-w`
+   - Named general: suffix is the name, persists
+   - Unnamed general: suffix is hash, removed after container exits
+   - Cleanup in `run_container` after docker returns (try/except shutil.rmtree)
+   Deliverable: General sessions have writable host-mounted working directory.
+   Verify: Write file in general session, confirm on host. Exit unnamed, confirm dir removed.
+   Exit named, confirm dir persists. `archie ls` shows named general sessions.
+
+3. **Named project session clones**
+   Approach:
+   - Implement `_create_session_clone`: clone top-level + sub-repos (one level deep)
+   - `--name` on a project session triggers clone into `~/.archie/sessions/<project>/<name>/`
    - Mount session dir at container's project path
-   - Reattach: if session dir exists, skip cloning — just mount and launch (identical
-     to fresh session). No automatic fetch/pull — agent handles sync if needed.
-   Deliverable: `archie session fix-auth` clones repos, launches container with correct mounts.
-   Verify: Create named session, verify clones exist with correct remotes, verify container
-   sees correct paths and `ak project` resolves. Resume session, verify no re-clone.
+   - Resume: if session dir exists, skip clone, just mount and launch
+   - Error if container with that name is already running
+   Deliverable: `archie --name fix-auth` clones repos, launches with correct mounts.
+   Verify: Create named session, verify clones with correct remotes. Resume, verify no
+   re-clone. `ak project` resolves correctly inside container.
 
-3. **Remove worktree code + multi-repo status/cleanup**
+4. **Session cleanup (`archie rm`)**
    Approach:
-   - Remove `create_or_reuse_worktree`, worktree-specific mount logic, `.git` file mount
-   - Remove `_resolve_name_from_worktree` from agent-kit `project.py` (cross-repo change,
-     committed to agent-kit's `feat/named-sessions` branch alongside archie changes)
-   - Rename `worktree_status` → `session_status`: iterate all `.git/` dirs in the session
-     directory (top-level + sub-repos), aggregate modified/ahead counts across all repos
-   - Update `_remove_session` cleanup: check all repos in the session dir for dirty/unpushed
-     state before prompting. Report which repos have uncommitted work.
-   - Update status display to show aggregated state
-   Deliverable: No worktree references remain. Sessions use clones only. Status and cleanup
-   handle multi-repo sessions correctly.
-   Verify: Full test of session create/resume/status/remove cycle. Verify `ak project`
-   resolves correctly inside a clone-based session (path-based resolution, no worktree
-   logic needed). Verify cleanup prompts when any sub-repo is dirty.
+   - `archie rm` (no args): remove all inactive clean sessions
+   - `archie rm <name>`: remove specific session, prompt if dirty
+   - `archie rm --all`: remove all inactive, prompt for each dirty one
+   - `-f` forces without prompts
+   - Dirty check: aggregate across all repos in session dir (reuse `session_status`)
+   - Non-interactive: refuse dirty unless `-f`
+   - Remove session directory (`shutil.rmtree`) after checks pass
+   Deliverable: `archie rm` safely cleans up sessions.
+   Verify: Create sessions, dirty one. `archie rm` removes clean ones only.
+   `archie rm <dirty>` prompts. `archie rm -f <dirty>` forces. Running session refuses.
 
-4. **Documentation**
+5. **Remove worktree code + documentation**
    Approach:
-   - Update `docs/sessions.md` — new session model, working dirs, clones
+   - Remove `create_or_reuse_worktree`, worktree mount logic, `.git` file mount
+   - Remove `_resolve_name_from_worktree` from agent-kit `project.py` (cross-repo,
+     committed on matching branch)
+   - Update `docs/sessions.md` — new CLI, working dirs, clones
    - Update `README.md` commands table
-   Deliverable: Documentation reflects final session model.
-   Verify: All flows documented.
+   - Update `CONTRIBUTING.md` if needed (container mounts section)
+   Deliverable: No worktree references remain. Documentation reflects final model.
+   Verify: Full session lifecycle test. `ak project` resolves in all session types.
+   Docs match implementation.
