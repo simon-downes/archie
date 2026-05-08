@@ -172,8 +172,11 @@ def _print_not_ready(s) -> None:
 @click.option("--plain", is_flag=True, help="Disable colours and formatting")
 @click.option("--name", default=None, help="Named session (isolated working directory)")
 @click.option("--shell", "use_shell", is_flag=True, help="Run bash instead of kiro-cli")
+@click.option("--bg", "background", is_flag=True, help="Run in background (not yet implemented)")
 @click.pass_context
-def main(ctx: click.Context, plain: bool, name: str | None, use_shell: bool) -> None:
+def main(
+    ctx: click.Context, plain: bool, name: str | None, use_shell: bool, background: bool
+) -> None:
     """Archie — personal AI platform."""
     if plain:
         from archie.output import console, console_err
@@ -183,6 +186,10 @@ def main(ctx: click.Context, plain: bool, name: str | None, use_shell: bool) -> 
 
     if ctx.invoked_subcommand is not None:
         return
+
+    if background:
+        print_error("Background mode (--bg) is not yet implemented")
+        sys.exit(1)
 
     if not is_installed():
         print_error(f"Archie is not installed. Run [{C_CMD}]archie install[/] first.")
