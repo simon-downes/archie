@@ -421,6 +421,7 @@ def run_container(
     project: Path | None = None,
     session_name: str | None = None,
     session_dir: Path | None = None,
+    background: bool = False,
 ) -> int:
     """Run a command in the sandbox container.
 
@@ -430,6 +431,7 @@ def run_container(
         project: Project path (None for general sessions).
         session_name: Named session identifier (None for unnamed).
         session_dir: Working directory to mount (None = mount project directly).
+        background: Run detached with stdin but no TTY.
     """
     from archie.auth.inject import resolve_credentials
     from archie.config import load_config, resolve_env, resolve_mounts
@@ -475,7 +477,9 @@ def run_container(
         container_brain = str(brain_dir).replace(host_home, container_home)
         args.extend(["-v", f"{brain_dir}:{container_brain}"])
 
-    if sys.stdin.isatty():
+    if background:
+        args.extend(["-d", "-i"])
+    elif sys.stdin.isatty():
         args.append("-it")
 
     for name, value in {**env, **creds}.items():

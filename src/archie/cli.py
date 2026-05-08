@@ -188,8 +188,9 @@ def main(
         return
 
     if background:
-        print_error("Background mode (--bg) is not yet implemented")
-        sys.exit(1)
+        if use_shell:
+            print_error("Cannot combine --bg and --shell")
+            sys.exit(1)
 
     if not is_installed():
         print_error(f"Archie is not installed. Run [{C_CMD}]archie install[/] first.")
@@ -207,10 +208,16 @@ def main(
     if not prompt and not sys.stdin.isatty():
         prompt = sys.stdin.read().strip() or None
 
-    _run_session(name=name, use_shell=use_shell, prompt=prompt)
+    if background and not prompt:
+        print_error("--bg requires a prompt")
+        sys.exit(1)
+
+    _run_session(name=name, use_shell=use_shell, prompt=prompt, background=background)
 
 
-def _run_session(*, name: str | None, use_shell: bool, prompt: str | None) -> None:
+def _run_session(
+    *, name: str | None, use_shell: bool, prompt: str | None, background: bool
+) -> None:
     """Launch a session (named or unnamed, project or general, shell or kiro-cli)."""
     from archie.config import resolve_project
     from archie.docker import _has_cloneable_repos
@@ -225,6 +232,8 @@ def _run_session(*, name: str | None, use_shell: bool, prompt: str | None) -> No
             command = ["/bin/bash"]
     else:
         command = ["kiro-cli", "chat", "--agent", "archie"]
+        if background:
+            command.append("--no-interactive")
         if prompt:
             command.append(prompt)
 
@@ -266,20 +275,21 @@ def _run_session(*, name: str | None, use_shell: bool, prompt: str | None) -> No
                 project=proj,
                 session_name=session_name,
                 session_dir=session_dir,
+                background=background,
             )
         )
 
     # Unnamed session
     if project:
         # Unnamed project — mount project dir directly
-        sys.exit(run_container(command, project=project))
+        sys.exit(run_container(command, project=project, background=background))
     else:
         # Unnamed general — transient working dir
         suffix = hash_suffix()
         session_dir = SESSIONS_DIR / "general" / suffix
         session_dir.mkdir(parents=True, exist_ok=True)
         try:
-            returncode = run_container(command, session_dir=session_dir)
+            returncode = run_container(command, session_dir=session_dir, background=background)
         finally:
             # Clean up transient dir
             if session_dir.exists():
