@@ -60,7 +60,40 @@ def _safe_remove_session(session_dir: Path) -> None:
 
 
 class ArchieCLI(click.Group):
-    """Click group with install guard and dynamic tool commands."""
+    """Click group with install guard and dynamic tool commands.
+
+    Overrides parse_args so that unrecognised positional arguments are treated
+    as prompt text rather than erroring with "No such command".
+    """
+
+    def parse_args(self, ctx, args):
+        """Intercept args before command resolution to extract prompt."""
+        # Find the first non-option arg and check if it's a command
+        rest = list(args)
+        opts = []
+        while rest:
+            if rest[0].startswith("-"):
+                # Consume the option and its value if applicable
+                opt = rest.pop(0)
+                opts.append(opt)
+                # Options that take a value
+                if opt in ("--name",) and rest:
+                    opts.append(rest.pop(0))
+            else:
+                break
+
+        if rest:
+            # Check if first positional is a known command
+            cmd_name = rest[0]
+            if self.get_command(ctx, cmd_name) is not None:
+                # It's a real command — let Click handle normally
+                return super().parse_args(ctx, args)
+            # Not a command — stash as prompt in ctx.obj, pass only opts to Click
+            ctx.ensure_object(dict)
+            ctx.obj["_prompt_args"] = rest
+            return super().parse_args(ctx, opts)
+
+        return super().parse_args(ctx, args)
 
     def invoke(self, ctx):
         subcommand = ctx.invoked_subcommand or (
@@ -160,7 +193,8 @@ def main(ctx: click.Context, plain: bool, name: str | None, use_shell: bool) -> 
         sys.exit(1)
 
     # Remaining args are the prompt
-    prompt = " ".join(ctx.args) if ctx.args else None
+    prompt_args = (ctx.obj or {}).get("_prompt_args", [])
+    prompt = " ".join(prompt_args) if prompt_args else None
 
     # Read piped input if no prompt and not a TTY
     if not prompt and not sys.stdin.isatty():
