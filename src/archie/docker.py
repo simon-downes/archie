@@ -109,24 +109,35 @@ def _get_remote_url(repo: Path) -> str:
     return result.stdout.strip()
 
 
+def _has_cloneable_repos(project: Path) -> bool:
+    """Check if a project has any git repos (itself or immediate children)."""
+    if has_git(project):
+        return True
+    return any(child.is_dir() and (child / ".git").is_dir() for child in project.iterdir())
+
+
 def create_session_clone(project: Path, session_name: str) -> Path:
     """Clone project and sub-repos into a session directory."""
     import shutil
 
     session_dir = SESSIONS_DIR / project.name / session_name
 
-    # Clone top-level repo
-    remote = _get_remote_url(project)
-    result = subprocess.run(
-        ["git", "clone", "--single-branch", remote, str(session_dir)],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        from archie.output import print_error
+    if has_git(project):
+        # Clone top-level repo (creates session_dir)
+        remote = _get_remote_url(project)
+        result = subprocess.run(
+            ["git", "clone", "--single-branch", remote, str(session_dir)],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            from archie.output import print_error
 
-        print_error(f"Failed to clone {project.name}: {result.stderr.strip()}")
-        raise SystemExit(1)
+            print_error(f"Failed to clone {project.name}: {result.stderr.strip()}")
+            raise SystemExit(1)
+    else:
+        # Project dir isn't a git repo — just create the session dir
+        session_dir.mkdir(parents=True, exist_ok=True)
 
     # Clone sub-repos (immediate subdirectories with .git/)
     for child in sorted(project.iterdir()):

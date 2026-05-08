@@ -206,7 +206,7 @@ def main(ctx: click.Context, plain: bool, name: str | None, use_shell: bool) -> 
 def _run_session(*, name: str | None, use_shell: bool, prompt: str | None) -> None:
     """Launch a session (named or unnamed, project or general, shell or kiro-cli)."""
     from archie.config import resolve_project
-    from archie.docker import has_git
+    from archie.docker import _has_cloneable_repos
 
     project = resolve_project()
 
@@ -234,7 +234,7 @@ def _run_session(*, name: str | None, use_shell: bool, prompt: str | None) -> No
         # Create or reuse session directory
         session_dir = existing_dir
         if not session_dir:
-            if proj and proj.exists() and has_git(proj):
+            if proj and proj.exists() and _has_cloneable_repos(proj):
                 print_info(f"Creating session [bright_blue]{session_name}[/bright_blue]...")
                 session_dir = create_session_clone(proj, session_name)
             elif proj and proj.exists():
