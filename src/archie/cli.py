@@ -1,5 +1,6 @@
 """CLI entry point for archie."""
 
+import shutil
 import sys
 from importlib.resources import as_file, files
 from pathlib import Path
@@ -7,7 +8,22 @@ from pathlib import Path
 import click
 
 from archie.config import check_status, install, is_installed, load_config
-from archie.docker import IMAGE_NAME, build_image, image_info, list_containers, run_container
+from archie.docker import (
+    IMAGE_NAME,
+    SESSIONS_DIR,
+    _docker_output,
+    _hash_suffix,
+    build_image,
+    container_name_for_session,
+    create_session_clone,
+    image_info,
+    list_containers,
+    list_sessions,
+    resolve_session,
+    run_container,
+    session_status,
+    validate_session_name,
+)
 from archie.output import (
     C_CMD,
     C_ERR,
@@ -27,7 +43,7 @@ from archie.output import (
 )
 
 # Built-in commands that can't be used as tool names
-BUILTIN_COMMANDS = {"install", "status", "build", "shell", "session"}
+BUILTIN_COMMANDS = {"install", "status", "build", "ls", "rm"}
 
 
 class ArchieCLI(click.Group):
@@ -83,8 +99,10 @@ def _make_tool_command(name: str, tool_config: dict) -> click.Command:
             _print_not_ready(s)
             sys.exit(1)
 
+        from archie.config import resolve_project
+
         args = ctx.args if ctx.args else default_args
-        sys.exit(run_container([command, *args], tool_name=name))
+        sys.exit(run_container([command, *args], tool_name=name, project=resolve_project()))
 
     tool_cmd.help = f"Run {command} in the sandbox."
     return tool_cmd
@@ -97,10 +115,18 @@ def _print_not_ready(s) -> None:
         print_error(f"[{C_KEY}]Docker[/] is not running")
 
 
+# --- Main command ---
+
+
 @click.group(invoke_without_command=True, cls=ArchieCLI)
 @click.option("--plain", is_flag=True, help="Disable colours and formatting")
+@click.option("--name", default=None, help="Named session (isolated working directory)")
+@click.option("--shell", "use_shell", is_flag=True, help="Run bash instead of kiro-cli")
+@click.argument("prompt", required=False)
 @click.pass_context
-def main(ctx: click.Context, plain: bool) -> None:
+def main(
+    ctx: click.Context, plain: bool, name: str | None, use_shell: bool, prompt: str | None
+) -> None:
     """Archie — personal AI platform."""
     if plain:
         from archie.output import console, console_err
@@ -108,15 +134,95 @@ def main(ctx: click.Context, plain: bool) -> None:
         console.no_color = True
         console_err.no_color = True
 
-    if ctx.invoked_subcommand is None:
-        if not is_installed():
-            print_error(f"Archie is not installed. Run [{C_CMD}]archie install[/] first.")
+    if ctx.invoked_subcommand is not None:
+        return
+
+    if not is_installed():
+        print_error(f"Archie is not installed. Run [{C_CMD}]archie install[/] first.")
+        sys.exit(1)
+    s = check_status()
+    if not s.ready:
+        _print_not_ready(s)
+        sys.exit(1)
+
+    # Read piped input if no prompt and not a TTY
+    if not prompt and not sys.stdin.isatty():
+        prompt = sys.stdin.read().strip() or None
+
+    _run_session(name=name, use_shell=use_shell, prompt=prompt)
+
+
+def _run_session(*, name: str | None, use_shell: bool, prompt: str | None) -> None:
+    """Launch a session (named or unnamed, project or general, shell or kiro-cli)."""
+    from archie.config import resolve_project
+    from archie.docker import _has_git
+
+    project = resolve_project()
+
+    # Build the command
+    if use_shell:
+        if prompt:
+            command = ["/bin/bash", "-c", prompt]
+        else:
+            command = ["/bin/bash"]
+    else:
+        command = ["kiro-cli", "chat", "--agent", "archie"]
+        if prompt:
+            command.extend(["--prompt", prompt])
+
+    # Named session
+    if name:
+        validate_session_name(name)
+        proj, session_name, existing_dir = resolve_session(name, project)
+
+        # Check if container already running
+        cn = container_name_for_session(proj, session_name)
+        if _docker_output("ps", "-q", "--filter", f"name=^/{cn}$"):
+            print_error(f"Session [bright_blue]{session_name}[/bright_blue] is already running")
             sys.exit(1)
-        s = check_status()
-        if not s.ready:
-            _print_not_ready(s)
-            sys.exit(1)
-        sys.exit(run_container(["kiro-cli", "chat", "--agent", "archie"]))
+
+        # Create or reuse session directory
+        session_dir = existing_dir
+        if not session_dir:
+            if proj and _has_git(proj):
+                print_info(f"Creating session [bright_blue]{session_name}[/bright_blue]...")
+                session_dir = create_session_clone(proj, session_name)
+            else:
+                # General named session — empty working dir
+                session_dir = SESSIONS_DIR / "general" / session_name
+                session_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            status = session_status(session_dir)
+            print_info(f"Resuming session [bright_blue]{session_name}[/bright_blue] ({status})")
+
+        sys.exit(
+            run_container(
+                command,
+                project=proj,
+                session_name=session_name,
+                session_dir=session_dir,
+            )
+        )
+
+    # Unnamed session
+    if project:
+        # Unnamed project — mount project dir directly
+        sys.exit(run_container(command, project=project))
+    else:
+        # Unnamed general — transient working dir
+        suffix = _hash_suffix()
+        session_dir = SESSIONS_DIR / "general" / suffix
+        session_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            returncode = run_container(command, session_dir=session_dir)
+        finally:
+            # Clean up transient dir
+            if session_dir.exists():
+                shutil.rmtree(session_dir, ignore_errors=True)
+        sys.exit(returncode)
+
+
+# --- Subcommands ---
 
 
 @main.command(name="install")
@@ -127,13 +233,144 @@ def install_cmd() -> None:
     print_success(f"Installed to [{C_VAL}]~/.archie/[/]")
 
 
+@main.command(name="ls")
+def ls_cmd() -> None:
+    """List sessions and their statuses."""
+    all_sessions = list_sessions()
+    if not all_sessions:
+        print_info("No sessions")
+        return
+
+    data_table(
+        *[
+            (
+                s["project"],
+                s["session"],
+                f"[{C_OK}]● running[/]" if s["active"] else f"[{C_MUTED}]○ inactive[/]",
+                s["status"] or "—",
+            )
+            for s in all_sessions
+        ],
+        styles=[C_KEY, C_VAL, "", C_MUTED],
+    )
+
+
+@main.command(name="rm")
+@click.argument("name", required=False)
+@click.option("--all", "remove_all", is_flag=True, help="Remove all inactive sessions")
+@click.option("-f", "force", is_flag=True, help="Force removal without prompts")
+def rm_cmd(name: str | None, remove_all: bool, force: bool) -> None:
+    """Remove session working directories."""
+    if name:
+        _remove_one_session(name, force)
+    elif remove_all:
+        _remove_all_sessions(force)
+    else:
+        _remove_clean_sessions()
+
+
+def _remove_one_session(name: str, force: bool) -> None:
+    """Remove a specific named session."""
+    from archie.config import resolve_project
+
+    project = resolve_project()
+    proj, session_name, session_dir = resolve_session(name, project)
+
+    if not session_dir or not session_dir.exists():
+        print_info(f"No session '{name}' found")
+        return
+
+    # Check for running container
+    cn = container_name_for_session(proj, session_name)
+    if _docker_output("ps", "-q", "--filter", f"name=^/{cn}$"):
+        print_error(f"Cannot remove — session [bright_blue]{session_name}[/bright_blue] is running")
+        sys.exit(1)
+
+    # Check dirty state
+    status = session_status(session_dir)
+    if status != "clean" and status != "empty" and not force:
+        if not sys.stdin.isatty():
+            print_error(f"Session has {status}. Use -f to force removal.")
+            sys.exit(1)
+        try:
+            reply = input(f"  Session '{session_name}' has {status}. Remove? [y/N] ")
+        except (EOFError, KeyboardInterrupt):
+            sys.exit(1)
+        if reply.strip().lower() != "y":
+            return
+
+    shutil.rmtree(session_dir)
+    # Clean up empty parent
+    parent = session_dir.parent
+    if parent.exists() and parent != SESSIONS_DIR and not any(parent.iterdir()):
+        parent.rmdir()
+    print_success(f"Removed session [bright_blue]{session_name}[/bright_blue]")
+
+
+def _remove_all_sessions(force: bool) -> None:
+    """Remove all inactive sessions, prompting for dirty ones."""
+    all_sessions = list_sessions()
+    inactive = [s for s in all_sessions if not s["active"] and s["session"] != "(unnamed)"]
+
+    if not inactive:
+        print_info("No inactive sessions to remove")
+        return
+
+    for s in inactive:
+        proj_name = s["project"]
+        sess_name = s["session"]
+        session_dir = SESSIONS_DIR / proj_name / sess_name
+
+        if not session_dir.exists():
+            continue
+
+        status = s["status"]
+        if status not in ("clean", "empty", "") and not force:
+            if not sys.stdin.isatty():
+                continue
+            try:
+                reply = input(f"  {proj_name}/{sess_name} has {status}. Remove? [y/N] ")
+            except (EOFError, KeyboardInterrupt):
+                return
+            if reply.strip().lower() != "y":
+                continue
+
+        shutil.rmtree(session_dir)
+        parent = session_dir.parent
+        if parent.exists() and parent != SESSIONS_DIR and not any(parent.iterdir()):
+            parent.rmdir()
+        print_success(f"Removed [bright_blue]{proj_name}/{sess_name}[/bright_blue]")
+
+
+def _remove_clean_sessions() -> None:
+    """Remove all inactive sessions that are clean."""
+    all_sessions = list_sessions()
+    inactive_clean = [
+        s
+        for s in all_sessions
+        if not s["active"] and s["session"] != "(unnamed)" and s["status"] in ("clean", "empty", "")
+    ]
+
+    if not inactive_clean:
+        print_info("No clean inactive sessions to remove")
+        return
+
+    for s in inactive_clean:
+        session_dir = SESSIONS_DIR / s["project"] / s["session"]
+        if session_dir.exists():
+            shutil.rmtree(session_dir)
+            parent = session_dir.parent
+            if parent.exists() and parent != SESSIONS_DIR and not any(parent.iterdir()):
+                parent.rmdir()
+            print_success(f"Removed [bright_blue]{s['project']}/{s['session']}[/bright_blue]")
+
+
 @main.command()
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def status(as_json: bool) -> None:
     """Check environment readiness."""
     import json as json_mod
     from datetime import datetime
-    from pathlib import Path
 
     from archie.auth.inject import _load_ak_credentials
     from archie.config import CONFIG_PATH
@@ -141,11 +378,9 @@ def status(as_json: bool) -> None:
     s = check_status()
     config = load_config()
 
-    # Collect all data
     img = image_info()
     containers = list_containers()
 
-    # Check credential mappings against agent-kit store
     ak_creds = _load_ak_credentials()
     creds_data = {}
     for env_name, dotpath in config.get("credentials", {}).items():
@@ -187,7 +422,6 @@ def status(as_json: bool) -> None:
         click.echo(json_mod.dumps(data, indent=2))
         return
 
-    # Rich output
     display_header()
 
     section("Environment")
@@ -245,20 +479,10 @@ def status(as_json: bool) -> None:
     else:
         status_table((False, "Directory", f"{brain_dir} (not found)"))
 
-    if containers:
-        section("Sessions")
-        data_table(
-            *[(c["name"], c["status"], c["image"]) for c in containers],
-            styles=[C_KEY, C_OK, C_MUTED],
-        )
-
-    # Named sessions (worktrees)
-    from archie.docker import list_sessions
-
+    # Sessions
     all_sessions = list_sessions()
-    named = [s for s in all_sessions if s["session"] != "(unnamed)"]
-    if named:
-        section("Named Sessions")
+    if all_sessions:
+        section("Sessions")
         data_table(
             *[
                 (
@@ -267,7 +491,7 @@ def status(as_json: bool) -> None:
                     f"[{C_OK}]● running[/]" if s["active"] else f"[{C_MUTED}]○ inactive[/]",
                     s["status"] or "—",
                 )
-                for s in named
+                for s in all_sessions
             ],
             styles=[C_KEY, C_VAL, "", C_MUTED],
         )
@@ -280,7 +504,6 @@ def status(as_json: bool) -> None:
 @click.option("--quick", is_flag=True, help="Use Docker cache for faster builds.")
 def build(quick: bool) -> None:
     """Build the sandbox Docker image."""
-    # Try package data first (installed mode), then source tree (editable mode)
     sandbox_pkg = files("archie").joinpath("sandbox", "Dockerfile")
     if sandbox_pkg.is_file():
         print_info(f"Building [{C_KEY}]{IMAGE_NAME}[/] image...")
@@ -293,7 +516,6 @@ def build(quick: bool) -> None:
             print_error(str(e))
             sys.exit(1)
 
-    # Editable install: look relative to the source tree
     source_dockerfile = Path(__file__).resolve().parent.parent.parent / "sandbox" / "Dockerfile"
     if source_dockerfile.is_file():
         print_info(f"Building [{C_KEY}]{IMAGE_NAME}[/] image...")
@@ -307,118 +529,3 @@ def build(quick: bool) -> None:
 
     print_error("Dockerfile not found in package data or source tree")
     sys.exit(1)
-
-
-@main.command()
-def shell() -> None:
-    """Start an interactive shell in the sandbox."""
-    s = check_status()
-    if not s.ready:
-        _print_not_ready(s)
-        sys.exit(1)
-
-    sys.exit(run_container(["/bin/bash"]))
-
-
-@main.command()
-@click.argument("name")
-@click.option("--rm", "remove", is_flag=True, help="Remove an inactive session")
-@click.option("-f", "force", is_flag=True, help="Force removal even if dirty/unpushed")
-def session(name: str, remove: bool, force: bool) -> None:
-    """Create or resume a named session."""
-    from archie.config import resolve_project
-    from archie.docker import (
-        _docker_output,
-        _has_git,
-        create_or_reuse_worktree,
-        resolve_session,
-        session_container_name,
-        worktree_status,
-    )
-
-    if remove:
-        _remove_session(name, force)
-        return
-
-    s = check_status()
-    if not s.ready:
-        _print_not_ready(s)
-        sys.exit(1)
-
-    project = resolve_project()
-    proj, session_name, existing_worktree = resolve_session(name, project)
-
-    # Determine container name and check if already running
-    container_name = session_container_name(proj, session_name)
-    if _docker_output("ps", "-q", "--filter", f"name=^/{container_name}$"):
-        print_error(f"Session [bright_blue]{session_name}[/bright_blue] is already running")
-        sys.exit(1)
-
-    # Create or reuse worktree for git-backed projects
-    worktree = None
-    if proj and _has_git(proj):
-        worktree = create_or_reuse_worktree(proj, session_name)
-        status = worktree_status(worktree)
-        if existing_worktree:
-            print_info(f"Resuming session [bright_blue]{session_name}[/bright_blue] ({status})")
-        else:
-            print_info(f"Creating session [bright_blue]{session_name}[/bright_blue]")
-
-    sys.exit(
-        run_container(
-            ["kiro-cli", "chat", "--agent", "archie"],
-            session=session_name,
-            worktree=worktree,
-            project_override=proj,
-        )
-    )
-
-
-def _remove_session(name: str, force: bool) -> None:
-    """Remove an inactive named session."""
-    import subprocess
-
-    from archie.config import resolve_project
-    from archie.docker import (
-        _docker_output,
-        resolve_session,
-        session_container_name,
-        worktree_status,
-    )
-
-    project = resolve_project()
-    proj, session_name, worktree = resolve_session(name, project)
-
-    if not worktree or not worktree.exists():
-        print_info(f"No session '{session_name}' found")
-        return
-
-    # Check for running container
-    container_name = session_container_name(proj, session_name)
-    if _docker_output("ps", "-q", "--filter", f"name=^/{container_name}$"):
-        print_error(f"Cannot remove — session [bright_blue]{session_name}[/bright_blue] is running")
-        sys.exit(1)
-
-    # Check dirty/unpushed state
-    status = worktree_status(worktree)
-    if status != "clean" and not force:
-        if not sys.stdin.isatty():
-            print_error(f"Session has {status}. Use -f to force removal.")
-            sys.exit(1)
-        try:
-            reply = input(f"  Session has {status}. Remove anyway? [y/N] ")
-        except (EOFError, KeyboardInterrupt):
-            sys.exit(1)
-        if reply.strip().lower() != "y":
-            sys.exit(0)
-
-    subprocess.run(
-        ["git", "worktree", "remove", "--force", str(worktree)],
-        check=True,
-    )
-    # Clean up empty parent directory
-    parent = worktree.parent
-    if parent.exists() and not any(parent.iterdir()):
-        parent.rmdir()
-
-    print_success(f"Removed session [bright_blue]{session_name}[/bright_blue]")

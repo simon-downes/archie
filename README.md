@@ -33,7 +33,11 @@ See [Getting Started](docs/getting-started.md) for credentials, brain setup, and
 | Command | Description |
 |---------|-------------|
 | `archie` | Run Archie in the sandbox |
-| `archie shell` | Interactive shell in the sandbox |
+| `archie "prompt"` | Run with an initial prompt |
+| `archie --name foo` | Named session (isolated working directory) |
+| `archie --shell` | Interactive shell in the sandbox |
+| `archie ls` | List sessions and statuses |
+| `archie rm [name]` | Remove session working directories |
 | `archie install` | Deploy persona and default config to `~/.archie/` |
 | `archie build` | Build the sandbox Docker image |
 | `archie build --quick` | Rebuild using Docker cache |
