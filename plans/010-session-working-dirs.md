@@ -90,7 +90,9 @@ container. Solves the data-passing problem (files written there are on the host)
 
 - Scan the project directory for immediate subdirectories containing `.git/`
 - Clone each sub-repo into the same relative path within the session directory
-- Sub-repos that are gitignored in the parent remain gitignored in the clone
+- Sub-repos that are gitignored in the parent (e.g. `agent-kit` in archie's `.gitignore`)
+  remain gitignored in the clone automatically — the parent's `.gitignore` is part of
+  the cloned content
 
 ### Working directory layout (named project session)
 
@@ -284,7 +286,7 @@ return returncode
 ## What changes from plan 006
 
 - **Remove**: worktree creation, `.git` file mount logic, worktree status checks,
-  `ak project` worktree resolution, `archie session` subcommand, `--session` flag
+  `ak project` worktree resolution, `archie session` subcommand, `archie shell` subcommand
 - **Keep**: session name validation, container naming logic, status display concept
 - **Replace**: worktree mount → clone mount, `session` subcommand → `--name` flag
 - **Add**: clone creation, sub-repo detection, general working dirs, `archie ls`,
@@ -295,11 +297,16 @@ return returncode
 1. **CLI restructure + multiple unnamed sessions**
    Approach:
    - Restructure main command: add `--name`, `--shell`, positional `prompt` argument
-   - Remove `session` subcommand, `--session` flag
+   - Remove `session` subcommand and `shell` subcommand (replaced by `--shell` flag)
+   - Remove `BUILTIN_COMMANDS` entry for `session` and `shell`
    - Add `ls` and `rm` subcommands
-   - All unnamed project sessions get hash suffix — remove collision check and
-     "start general instead?" prompt entirely
+   - All unnamed project sessions get hash suffix (same pattern as general sessions:
+     `hashlib.sha1(str(time.time_ns()).encode()).hexdigest()[:5]`) — remove collision
+     check and "start general instead?" prompt entirely
    - Piped stdin detection: if not TTY and no prompt arg, read stdin
+   - `rm` operates globally (all projects) — uses same resolution logic as session
+     creation: scoped to current project if in one, qualified names from anywhere,
+     search with ambiguity error
    Deliverable: New CLI interface works for unnamed sessions (current behaviour preserved
    with new flags). `archie ls` shows running containers.
    Verify: `archie` launches interactive session. `archie "hello"` passes prompt.
@@ -330,22 +337,30 @@ return returncode
 
 4. **Session cleanup (`archie rm`)**
    Approach:
-   - `archie rm` (no args): remove all inactive clean sessions
+   - Session resolution for `rm` uses same logic as creation: project-scoped if in a
+     project dir, qualified names (`project/session`) from anywhere, search with
+     ambiguity error if outside a project
+   - `archie rm` (no args): remove all inactive clean sessions globally
    - `archie rm <name>`: remove specific session, prompt if dirty
    - `archie rm --all`: remove all inactive, prompt for each dirty one
    - `-f` forces without prompts
-   - Dirty check: aggregate across all repos in session dir (reuse `session_status`)
-   - Non-interactive: refuse dirty unless `-f`
+   - Dirty check: for sessions with git repos, aggregate across all repos (reuse
+     `session_status`). For non-git sessions (general), always considered clean —
+     just remove.
+   - Non-interactive: refuse dirty git sessions unless `-f`
    - Remove session directory (`shutil.rmtree`) after checks pass
    Deliverable: `archie rm` safely cleans up sessions.
    Verify: Create sessions, dirty one. `archie rm` removes clean ones only.
    `archie rm <dirty>` prompts. `archie rm -f <dirty>` forces. Running session refuses.
+   Non-git general session removed without prompt.
 
 5. **Remove worktree code + documentation**
    Approach:
    - Remove `create_or_reuse_worktree`, worktree mount logic, `.git` file mount
    - Remove `_resolve_name_from_worktree` from agent-kit `project.py` (cross-repo,
-     committed on matching branch)
+     committed on matching branch). After removal, `ak project` resolves via the
+     existing `relative_to(project_dir)` path — this works because clone-based sessions
+     mount at the original project path (e.g. `~/dev/archie`).
    - Update `docs/sessions.md` — new CLI, working dirs, clones
    - Update `README.md` commands table
    - Update `CONTRIBUTING.md` if needed (container mounts section)
