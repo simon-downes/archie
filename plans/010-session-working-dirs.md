@@ -155,24 +155,29 @@ problem — files written there are accessible on the host.
 def _create_session_clone(project: Path, session_name: str) -> Path:
     """Clone project and sub-repos into a session directory."""
     session_dir = ARCHIE_HOME / "sessions" / project.name / session_name
-    session_dir.mkdir(parents=True, exist_ok=True)
 
-    # Clone top-level repo
+    # Clone top-level repo (git clone creates the target directory)
     remote = _get_remote_url(project)
-    subprocess.run(
+    result = subprocess.run(
         ["git", "clone", "--single-branch", remote, str(session_dir)],
-        check=True,
+        capture_output=True, text=True,
     )
+    if result.returncode != 0:
+        print_error(f"Failed to clone {project.name}: {result.stderr.strip()}")
+        raise SystemExit(1)
 
-    # Clone sub-repos (one level deep)
+    # Clone sub-repos (immediate subdirectories with .git/)
     for child in sorted(project.iterdir()):
-        if child.is_dir() and (child / ".git").is_dir() and child != project:
+        if child.is_dir() and (child / ".git").is_dir():
             sub_remote = _get_remote_url(child)
             sub_dest = session_dir / child.name
-            subprocess.run(
+            result = subprocess.run(
                 ["git", "clone", "--single-branch", sub_remote, str(sub_dest)],
-                check=True,
+                capture_output=True, text=True,
             )
+            if result.returncode != 0:
+                print_error(f"Failed to clone {child.name}: {result.stderr.strip()}")
+                raise SystemExit(1)
 
     return session_dir
 
@@ -225,31 +230,45 @@ return returncode
 
 1. **Multiple unnamed project sessions + general working dirs**
    Approach:
-   - Remove single-session restriction (hash suffix for all unnamed project sessions)
-   - Create working directory for all general sessions
-   - Mount general session working dir at `~/workspace/`
-   - Clean up unnamed general dirs on exit
+   - Remove single-session restriction: all unnamed project sessions get a hash suffix
+     in the container name. Remove the "Start a general session instead?" prompt entirely.
+   - General session working dir creation lives in `run_container()`: when no project and
+     no worktree, create `~/.archie/sessions/general/<suffix>/` and mount it. The dir path
+     is stored in a local variable and passed to cleanup after the container exits.
+   - Cleanup: after `_docker(*args)` returns, if the session was unnamed general,
+     `shutil.rmtree(session_dir)`. Wrap in try/except (dir may already be gone).
    Deliverable: Multiple unnamed project sessions coexist. General sessions have writable host dir.
-   Verify: Launch two unnamed project sessions simultaneously. Write a file in general session, confirm visible on host.
+   Verify: Launch two unnamed project sessions simultaneously — both start without error.
+   Write a file in a general session, confirm visible on host at `~/.archie/sessions/general/<hash>/`.
+   Exit the general session, confirm the directory is removed.
 
 2. **Named session clone creation**
    Approach:
-   - Replace worktree creation with clone logic
-   - Detect sub-repos (one level deep, `.git/` dirs)
+   - Replace worktree creation with clone logic in `docker.py`
+   - Detect sub-repos (one level deep, immediate subdirs with `.git/`)
    - Clone top-level + sub-repos using `git clone --single-branch <remote>`
    - Mount session dir at container's project path
-   - Reattach if session dir exists
+   - Reattach: if session dir exists, skip cloning — just mount and launch (identical
+     to fresh session). No automatic fetch/pull — agent handles sync if needed.
    Deliverable: `archie session fix-auth` clones repos, launches container with correct mounts.
-   Verify: Create named session, verify clones exist, verify container sees correct paths. Resume session, verify no re-clone.
+   Verify: Create named session, verify clones exist with correct remotes, verify container
+   sees correct paths and `ak project` resolves. Resume session, verify no re-clone.
 
-3. **Remove worktree code**
+3. **Remove worktree code + multi-repo status/cleanup**
    Approach:
    - Remove `create_or_reuse_worktree`, worktree-specific mount logic, `.git` file mount
-   - Remove `ak project` worktree resolution (no longer needed — container paths match)
-   - Update `worktree_status` → `session_status` (reads git state from session dir clones)
-   - Update status display
-   Deliverable: No worktree references remain. Sessions use clones only.
-   Verify: Full test of session create/resume/status/remove cycle.
+   - Remove `_resolve_name_from_worktree` from agent-kit `project.py` (cross-repo change,
+     committed to agent-kit's `feat/named-sessions` branch alongside archie changes)
+   - Rename `worktree_status` → `session_status`: iterate all `.git/` dirs in the session
+     directory (top-level + sub-repos), aggregate modified/ahead counts across all repos
+   - Update `_remove_session` cleanup: check all repos in the session dir for dirty/unpushed
+     state before prompting. Report which repos have uncommitted work.
+   - Update status display to show aggregated state
+   Deliverable: No worktree references remain. Sessions use clones only. Status and cleanup
+   handle multi-repo sessions correctly.
+   Verify: Full test of session create/resume/status/remove cycle. Verify `ak project`
+   resolves correctly inside a clone-based session (path-based resolution, no worktree
+   logic needed). Verify cleanup prompts when any sub-repo is dirty.
 
 4. **Documentation**
    Approach:
