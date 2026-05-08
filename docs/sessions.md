@@ -30,16 +30,35 @@ tied to a single project.
 
 ### Named Sessions
 
-Use `--session` to give a general session a stable name:
+Use `archie session` to create a named, resumable session:
 
 ```bash
-archie --session research
+archie session research
 # → container: archie-general-research
 ```
 
-Named sessions follow the same one-at-a-time rule — you can't start two sessions
-with the same name. Without `--session`, each session gets a unique hash suffix and
-there's no conflict.
+For project sessions with a git repo, named sessions get their own worktree:
+
+```bash
+cd ~/dev/my-project
+archie session fix-auth
+# → worktree: ~/.archie/worktrees/my-project/fix-auth/
+# → branch: archie/fix-auth
+# → container: archie-shell-my-project-fix-auth
+```
+
+Running the same command again resumes the session (reattaches to the existing worktree).
+
+Named sessions follow the one-at-a-time rule — you can't start two sessions with the
+same name. Use `archie session --rm <name>` to remove an inactive session.
+
+### Qualified Names
+
+Use `project/session` to target a specific project's session from anywhere:
+
+```bash
+archie session archie/fix-auth
+```
 
 ## Archie Development
 

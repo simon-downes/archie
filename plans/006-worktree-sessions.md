@@ -1,177 +1,304 @@
-# Archie — Git Worktree Sessions
+# Archie — Named Sessions with Worktrees
 
 ## Objective
 
-Enable multiple concurrent project sessions by giving each session its own git worktree.
-Remove the single-session-per-project restriction. Worktrees persist until explicitly
-removed, with guardrails to prevent losing uncommitted or unpushed changes.
+Add named sessions with git worktree backing. Named sessions are resumable — the
+worktree persists between container runs, enabling long-running work across multiple
+invocations. Unnamed sessions remain ephemeral (current behaviour).
+
+## Concepts
+
+- **Session** — a named, resumable workspace. The worktree is the durable state;
+  the container is the ephemeral runtime.
+- **Unnamed session** — current behaviour. Anonymous container, project mounted
+  directly, no worktree. Multiple can run against the same project (deconflicting
+  is the user's problem).
+- **Named session without git** — just a stable container name. No worktree, no
+  persistence beyond the container lifetime. Errors if already running.
 
 ## Requirements
 
-### Worktree Creation
+### Session Creation and Resume
 
-- MUST create a worktree for each new project session (when the project has a git repo)
-  - AC: `archie` in a project dir creates a worktree with a short hash name (e.g. `a3f9c`)
-  - AC: `archie --session <name>` creates (or reattaches to) a named worktree
-  - AC: Worktrees stored at `~/.archie/worktrees/<project>/<session>/`
-  - AC: Branch created as `archie/<session>` based on the current HEAD of the main checkout
-  - AC: Projects without a `.git` directory use direct mount (current behaviour, no worktree)
-  - AC: General sessions are unchanged (no worktree)
+- `archie session <name>` creates or resumes a named session
+  - AC: If project has `.git`, creates worktree at `~/.archie/worktrees/<project>/<name>/`
+  - AC: Worktree created on branch `archie/<name>` (new branch from HEAD, or existing branch if it already exists)
+  - AC: If worktree already exists, reattaches (mounts existing worktree)
+  - AC: Enables reviewing existing branches — `archie session feature-x` checks out `archie/feature-x` if it exists
+  - AC: If container with session name is already running, errors
+  - AC: Projects without `.git` get a stable container name only (no worktree)
+  - AC: General sessions (outside project dir) get a stable container name only
 
-### Multi-Session Support
+### Session Resolution
 
-- MUST remove the single-session-per-project restriction
-  - AC: Multiple containers can run against the same project simultaneously
-  - AC: Each gets its own worktree and container name (`archie-shell-<project>-<session>`)
-  - AC: Reusing a session name with an active container still errors (container name conflict)
-  - AC: Reusing a session name with no active container reattaches to the existing worktree
+- Session name resolves based on context:
+  - AC: In a project dir → scoped to that project (create or resume)
+  - AC: Outside any project → search all worktrees, error if ambiguous, resume if unique
+  - AC: Qualified name (`project/session`) works from anywhere
 
-### Container Mounts
+### Container Mounts (named session with worktree)
 
 - MUST mount the worktree as the container's working directory
   - AC: Worktree mounted rw at the container path where the project would normally appear
-  - AC: Main project's `.git/` mounted rw at its expected path (worktree needs write access to objects/refs)
-  - AC: Main project source files are NOT mounted (only `.git/`)
+  - AC: Main project's `.git/` mounted at its host path (worktree's `gitdir:` resolves)
   - AC: Container working directory (`-w`) set to the worktree mount path
+  - AC: Assumption: project lives under `$HOME` (host path = container path since
+    container username matches host username)
 
-### Worktree Persistence and Safety
+### Unnamed Sessions (no change)
 
-- MUST NOT auto-remove worktrees
-  - AC: Session exit (graceful or crash) leaves the worktree on disk
-  - AC: Container is removed (`--rm`) but worktree persists
-- MUST provide explicit worktree management commands
-  - AC: `archie worktree ls` — lists worktrees per project, shows status (clean/dirty/unpushed, active session or orphaned)
-  - AC: `archie worktree rm <project> <session>` — removes worktree only if clean and fully pushed
-  - AC: `archie worktree rm <project> <session> --force` — removes regardless of state
-  - AC: Status check: `git status --porcelain` for dirty, `git log @{upstream}..HEAD` for unpushed
+- `archie` with no subcommand behaves exactly as today
+  - AC: Project directory mounted directly
+  - AC: Container named `archie-{tool_name}-<project>` (or `archie-general-<hash>`)
+  - AC: Multiple unnamed sessions can run against the same project
+
+### Session Cleanup
+
+- `archie session --rm <name>` removes a named session
+  - AC: Cannot remove if a container is running for that session (error)
+  - AC: Removes immediately if worktree is clean and fully pushed (or no worktree)
+  - AC: Prompts for confirmation if uncommitted changes or unpushed commits exist
+  - AC: `archie session --rm -f <name>` forces removal regardless of state
+  - AC: Non-interactive (piped/CI): refuses dirty removal unless `-f` is passed
+  - AC: Runs `git worktree remove` to clean up
+
+### Status
+
+- `archie status` shows all sessions
+  - AC: Running containers (active sessions — named and unnamed)
+  - AC: Worktrees with no container (inactive named sessions)
+  - AC: Git state for worktrees: ahead/behind, modified files count
+  - AC: Example output:
+    ```
+    Sessions:
+      archie  fix-auth   ● running    3 ahead, clean
+      archie  refactor   ○ inactive   1 ahead, 2 modified
+      tillo   (unnamed)  ● running    —
+      general research   ● running    —
+    ```
 
 ### Project Resolution from Worktrees
 
 - MUST update `ak project` to resolve correctly when cwd is a worktree
-  - AC: Reads the worktree's `.git` file → follows `gitdir:` path → derives main repo location
-  - AC: Resolves project name from main repo path against `project_dir`
-  - AC: All downstream (brain, issues config, slack) works identically to main checkout
+  - AC: Reads `.git` file → follows `gitdir:` path → derives main repo location
+  - AC: Resolves project name from main repo path
+  - AC: All downstream (brain, issues config, slack) works identically
+
+### CLI Changes
+
+- Remove existing `--session` flag from the main command
+- Add `session` subcommand
 
 ## Technical Design
+
+### Current State
+
+- `run_container()` in `docker.py` handles project and general sessions
+- Container naming: `archie-{tool_name}-{project}` for project, `archie-general-{suffix}` for general
+- `tool_name` defaults to `"shell"` — only differs if a dynamic tool command is configured
+- `--session` flag exists on main command, applies only to general sessions (being removed)
+- `resolve_project()` in `config.py` resolves from cwd relative to `project_dir`
+- Brain mount is always read-write
 
 ### Worktree Layout
 
 ```
 ~/.archie/worktrees/
 └── my-project/
-    ├── a3f9c/          # anonymous session worktree
-    │   ├── .git        # file: gitdir: /home/simon/dev/my-project/.git/worktrees/a3f9c
+    ├── fix-auth/       # named session
+    │   ├── .git        # file: gitdir: /home/simon/dev/my-project/.git/worktrees/fix-auth
     │   └── <source>
-    └── fix-auth/       # named session worktree
+    └── refactor/       # another named session
         ├── .git
         └── <source>
 ```
 
-### Worktree Creation (host-side, in docker.py)
-
-When launching a project session with git:
+### Session Command (cli.py)
 
 ```python
-worktree_dir = ARCHIE_HOME / "worktrees" / project.name / session_name
-if not worktree_dir.exists():
-    subprocess.run([
-        "git", "-C", str(project), "worktree", "add",
-        str(worktree_dir), "-b", f"archie/{session_name}"
-    ], check=True)
+@main.command()
+@click.argument("name")
+@click.option("--rm", "remove", is_flag=True, help="Remove an inactive session")
+@click.option("-f", "force", is_flag=True, help="Force removal even if dirty/unpushed")
+def session(name: str, remove: bool, force: bool) -> None:
+    if remove:
+        _remove_session(name, force=force)
+    else:
+        _start_session(name)
 ```
 
-If the worktree already exists (reattach), skip creation.
+### Worktree Creation (docker.py)
+
+```python
+def _create_or_reuse_worktree(project: Path, session_name: str) -> Path:
+    worktree_dir = ARCHIE_HOME / "worktrees" / project.name / session_name
+    if worktree_dir.exists():
+        return worktree_dir  # reattach
+
+    branch = f"archie/{session_name}"
+    # Check if branch already exists
+    result = subprocess.run(
+        ["git", "-C", str(project), "rev-parse", "--verify", branch],
+        capture_output=True,
+    )
+    if result.returncode == 0:
+        # Branch exists — create worktree using it
+        subprocess.run(
+            ["git", "-C", str(project), "worktree", "add", str(worktree_dir), branch],
+            check=True,
+        )
+    else:
+        # New branch from HEAD
+        subprocess.run(
+            ["git", "-C", str(project), "worktree", "add", str(worktree_dir), "-b", branch],
+            check=True,
+        )
+    return worktree_dir
+```
 
 ### Container Mount Strategy
 
 ```python
-# Mount worktree as the project directory
-args.extend(["-v", f"{worktree_dir}:{container_project}"])
+# Named session with worktree
+args.extend(["-v", f"{worktree_dir}:{container_project}", "-w", container_project])
 
-# Mount main repo .git for shared object store (rw — worktree writes objects/refs)
-args.extend(["-v", f"{project}/.git:{container_project}/.git-main"])
-```
-
-Wait — the worktree's `.git` file contains an absolute host path. Inside the container
-that path must resolve. Simplest approach: mount the main `.git/` at the same absolute
-path it has on the host:
-
-```python
+# Mount main .git at its host path so worktree's gitdir: reference resolves
 host_git_dir = project / ".git"
 args.extend(["-v", f"{host_git_dir}:{str(host_git_dir)}"])
 ```
 
-The worktree's `.git` file already points to the host path, which now resolves inside
-the container too.
+Note: this relies on project living under `$HOME` and the container username matching
+the host username (both true in our setup — container user is `HOST_USERNAME`).
 
-### Session Naming
+### Session Resolution Logic
 
-- No `--session` flag: generate 5-char hex hash (same as current general session pattern)
-- `--session <name>`: use as-is (sanitized for filesystem/docker)
-- Container name: `archie-shell-<project>-<session>`
+```python
+def _resolve_session(name: str, project: Path | None) -> tuple[Path | None, Path | None]:
+    """Resolve session name to (project_path, worktree_dir | None).
 
-### Removing the Single-Session Restriction
+    Returns (project, None) for non-git or general sessions.
+    """
+    # Qualified name: "project/session"
+    if "/" in name:
+        proj_name, session_name = name.split("/", 1)
+        proj_path = project_dir / proj_name
+        worktree = ARCHIE_HOME / "worktrees" / proj_name / session_name
+        return proj_path, worktree if worktree.exists() else None
 
-Current code in `run_container()` checks for existing container by name. With session
-names in the container name, each session is unique. The check remains (prevents
-duplicate containers with the same name) but no longer blocks multiple project sessions.
+    # In a project dir — scope to this project
+    if project:
+        worktree = ARCHIE_HOME / "worktrees" / project.name / name
+        return project, worktree if worktree.exists() else None
 
-### ak project Worktree Resolution
+    # Outside project — search all worktrees
+    matches = list((ARCHIE_HOME / "worktrees").glob(f"*/{name}"))
+    if len(matches) == 1:
+        proj_name = matches[0].parent.name
+        return project_dir / proj_name, matches[0]
+    elif len(matches) > 1:
+        raise click.UsageError(
+            f"Ambiguous session '{name}' — exists in: {[m.parent.name for m in matches]}"
+        )
+    return None, None  # new general session
+```
 
-Add a resolution step before the existing `project_dir` check:
+### Container Naming
+
+- Named project session: `archie-{tool_name}-<project>-<session>`
+- Unnamed project session: `archie-{tool_name}-<project>` (current)
+- Named general session: `archie-general-<session>`
+- Unnamed general session: `archie-general-<hash>` (current)
+
+### Session Removal Logic
+
+```python
+def _remove_session(name: str, force: bool) -> None:
+    # Resolve session
+    project, worktree = _resolve_session(name, resolve_project())
+
+    # Check for running container
+    container_name = _session_container_name(project, name)
+    if _docker_output("ps", "-q", "--filter", f"name=^/{container_name}$"):
+        print_error("Cannot remove — session is running")
+        sys.exit(1)
+
+    if not worktree or not worktree.exists():
+        print_info("No worktree to remove")
+        return
+
+    # Check dirty/unpushed state
+    dirty = _worktree_is_dirty(worktree)
+    if dirty and not force:
+        if not sys.stdin.isatty():
+            print_error("Worktree has uncommitted/unpushed changes. Use -f to force.")
+            sys.exit(1)
+        reply = input(f"  Session has {dirty}. Remove anyway? [y/N] ")
+        if reply.strip().lower() != "y":
+            sys.exit(0)
+
+    subprocess.run(["git", "worktree", "remove", "--force", str(worktree)], check=True)
+```
+
+### ak project Worktree Resolution (agent-kit/project.py)
 
 ```python
 def _resolve_from_worktree(cwd: Path) -> tuple[str, str] | None:
     """If cwd is inside a worktree, follow .git file back to main repo."""
-    git_file = _find_git_file(cwd)
-    if git_file and git_file.is_file():
-        content = git_file.read_text().strip()
+    git_path = _find_git_marker(cwd)
+    if git_path and git_path.is_file():
+        content = git_path.read_text().strip()
         if content.startswith("gitdir:"):
-            # gitdir: /home/simon/dev/my-project/.git/worktrees/a3f9c
             git_dir = Path(content.split(":", 1)[1].strip())
-            # Walk up: .git/worktrees/<name> → .git → project root
+            # .git/worktrees/<name> → .git → project root
             main_repo = git_dir.parent.parent.parent
             return main_repo.name, str(main_repo)
     return None
 ```
 
-This runs before the `project_dir` check. If it resolves, use that project name.
-The git remote is still read from the worktree (it shares refs with main repo).
+Runs before the existing `project_dir` resolution in `resolve_project()`.
+
+### Status Display
+
+Merge two data sources:
+1. Running containers (`docker ps --filter name=archie-`)
+2. Worktree directories (`~/.archie/worktrees/`)
+
+For each worktree, run:
+- `git -C <worktree> status --porcelain` → modified count
+- `git -C <worktree> log @{upstream}..HEAD 2>/dev/null` → ahead count
 
 ## Milestones
 
-1. **Worktree creation and mount logic**
+1. **Session command and worktree creation**
    Approach:
-   - Add `_create_or_reuse_worktree(project: Path, session: str) -> Path` to `docker.py`
-   - Modify `run_container()`: if project has `.git`, create worktree, mount it instead
-     of the project directory. Mount main `.git/` at its host path.
-   - Generate session name (hash or from `--session` flag).
-   - Update container naming to include session: `archie-shell-<project>-<session>`.
-   - Remove the "already running" error for project sessions (keep it for same session name).
-   Deliverable: Multiple project sessions can run concurrently, each in its own worktree.
-   Verify: Launch two sessions for the same project, verify separate worktrees and branches.
+   - Add `archie session <name>` command to `cli.py`
+   - Remove `--session` flag from main command
+   - Add `_create_or_reuse_worktree()` to `docker.py`
+   - Modify `run_container()` to accept a worktree path and mount accordingly
+   - Implement session resolution logic (project-scoped, qualified, search)
+   - Update container naming to include session suffix for named sessions
+   Deliverable: `archie session fix-auth` creates worktree, launches container, reattaches on second run.
+   Verify: Create session, exit, resume. Verify worktree persists. Verify two named sessions coexist.
 
-2. **Worktree management commands**
+2. **ak project worktree resolution**
    Approach:
-   - Add `archie worktree` command group to `cli.py` with `ls` and `rm` subcommands.
-   - `ls`: scan `~/.archie/worktrees/`, for each run `git status --porcelain` and
-     `git log @{upstream}..HEAD`, cross-reference with running containers.
-   - `rm`: check clean + pushed, refuse unless `--force`. Run `git worktree remove`.
-   Deliverable: `archie worktree ls` shows all worktrees with status.
-   Verify: Create worktrees, dirty one, verify `ls` shows correct status, verify `rm` refuses.
+   - Add `.git` file detection to agent-kit `project.py`
+   - Parse `gitdir:` line, walk up to main repo
+   - Run before existing `project_dir` resolution
+   Deliverable: `ak project` works correctly inside a worktree container.
+   Verify: Run `ak project` from worktree, confirm project name matches.
 
-3. **Update ak project for worktree resolution**
+3. **Status and cleanup**
    Approach:
-   - Add worktree detection to `resolve_project()` in agent-kit `project.py`.
-   - If cwd contains a `.git` file (not directory), parse `gitdir:` line, resolve main repo.
-   - Derive project name from main repo path against `project_dir`.
-   - Org/remote still resolved from git remote (shared between worktree and main repo).
-   Deliverable: `ak project` returns correct project info when run inside a worktree.
-   Verify: Run `ak project` from inside a worktree, verify name/org/path match main project.
+   - Update `archie status` to show sessions (running containers + inactive worktrees with git state)
+   - Implement `archie session --rm <name>` with safety checks (running container, dirty/unpushed, force flag)
+   - Non-interactive: refuse dirty removal unless `-f`
+   Deliverable: `archie status` shows full session picture. Cleanup works safely.
+   Verify: Create sessions, stop some, verify status output. Remove clean session. Verify prompt on dirty. Verify `-f` forces. Verify refusal when container running.
 
-4. **Update CLI flags and session prompt**
+4. **Documentation**
    Approach:
-   - Add `--session` option to `main()` in `cli.py` (already exists for general, extend to project).
-   - Update `display_header` to show session name.
-   Deliverable: `archie --session fix-auth` creates/reattaches named worktree session.
-   Verify: Named session creates worktree, second invocation reattaches.
+   - Rewrite `docs/sessions.md` — named sessions, worktrees, resume, cleanup
+   - Update `README.md` commands table
+   Deliverable: Documentation reflects new session model.
+   Verify: Commands table matches implementation. Sessions doc covers all flows.
