@@ -20,13 +20,14 @@ def _load_ak_credentials() -> dict:
         return {}
 
 
-def _resolve_ak(dotpath: str) -> str | None:
+def _resolve_ak(dotpath: str, creds: dict | None = None) -> str | None:
     """Resolve an ak.service.field dotpath against agent-kit credentials."""
     parts = dotpath.split(".", 2)
     if len(parts) != 3 or parts[0] != "ak":
         return None
     service, field = parts[1], parts[2]
-    creds = _load_ak_credentials()
+    if creds is None:
+        creds = _load_ak_credentials()
     service_data = creds.get(service)
     if isinstance(service_data, dict):
         value = service_data.get(field)
@@ -34,7 +35,7 @@ def _resolve_ak(dotpath: str) -> str | None:
     return None
 
 
-def _try_refresh_ak(service: str, config: dict) -> bool:
+def _try_refresh_ak(service: str) -> bool:
     """Attempt to refresh expired OAuth tokens via agent-kit."""
     try:
         ak_config_path = Path.home() / ".agent-kit" / "config.yaml"
@@ -88,9 +89,10 @@ def _try_refresh_ak(service: str, config: dict) -> bool:
         return False
 
 
-def _is_expired_ak(service: str) -> bool:
+def _is_expired_ak(service: str, creds: dict | None = None) -> bool:
     """Check if an agent-kit service's credentials have expired."""
-    creds = _load_ak_credentials()
+    if creds is None:
+        creds = _load_ak_credentials()
     expires_at = (creds.get(service) or {}).get("expires_at")
     if not expires_at:
         return False
@@ -110,6 +112,7 @@ def resolve_credentials(config: dict) -> dict[str, str]:
     """
     services_refreshed: set[str] = set()
     env = {}
+    creds = _load_ak_credentials()
 
     for env_name, dotpath in config.get("credentials", {}).items():
         if not isinstance(dotpath, str) or not dotpath.startswith("ak."):
@@ -123,17 +126,18 @@ def resolve_credentials(config: dict) -> dict[str, str]:
         # Auto-refresh expired OAuth tokens (once per service)
         if service not in services_refreshed:
             services_refreshed.add(service)
-            if _is_expired_ak(service):
-                if _try_refresh_ak(service, config):
+            if _is_expired_ak(service, creds):
+                if _try_refresh_ak(service):
                     from archie.output import print_info
 
                     print_info(f"Refreshed expired tokens for {service}")
+                    creds = _load_ak_credentials()  # reload after refresh
                 else:
                     from archie.output import print_error
 
                     print_error(f"Failed to refresh expired tokens for {service}")
 
-        value = _resolve_ak(dotpath)
+        value = _resolve_ak(dotpath, creds)
         if value is not None:
             env[env_name] = value
 

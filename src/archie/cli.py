@@ -11,11 +11,11 @@ from archie.config import check_status, install, is_installed, load_config
 from archie.docker import (
     IMAGE_NAME,
     SESSIONS_DIR,
-    _docker_output,
-    _hash_suffix,
     build_image,
     container_name_for_session,
     create_session_clone,
+    docker_output,
+    hash_suffix,
     image_info,
     list_containers,
     list_sessions,
@@ -71,13 +71,13 @@ class ArchieCLI(click.Group):
         # Find the first non-option arg and check if it's a command
         rest = list(args)
         opts = []
+        # NOTE: if a new value-taking option is added to main(), add it here too
+        value_options = ("--name",)
         while rest:
             if rest[0].startswith("-"):
-                # Consume the option and its value if applicable
                 opt = rest.pop(0)
                 opts.append(opt)
-                # Options that take a value
-                if opt in ("--name",) and rest:
+                if opt in value_options and rest:
                     opts.append(rest.pop(0))
             else:
                 break
@@ -206,7 +206,7 @@ def main(ctx: click.Context, plain: bool, name: str | None, use_shell: bool) -> 
 def _run_session(*, name: str | None, use_shell: bool, prompt: str | None) -> None:
     """Launch a session (named or unnamed, project or general, shell or kiro-cli)."""
     from archie.config import resolve_project
-    from archie.docker import _has_git
+    from archie.docker import has_git
 
     project = resolve_project()
 
@@ -227,14 +227,14 @@ def _run_session(*, name: str | None, use_shell: bool, prompt: str | None) -> No
 
         # Check if container already running
         cn = container_name_for_session(proj, session_name)
-        if _docker_output("ps", "-q", "--filter", f"name=^/{cn}$"):
+        if docker_output("ps", "-q", "--filter", f"name=^/{cn}$"):
             print_error(f"Session [bright_blue]{session_name}[/bright_blue] is already running")
             sys.exit(1)
 
         # Create or reuse session directory
         session_dir = existing_dir
         if not session_dir:
-            if proj and proj.exists() and _has_git(proj):
+            if proj and proj.exists() and has_git(proj):
                 print_info(f"Creating session [bright_blue]{session_name}[/bright_blue]...")
                 session_dir = create_session_clone(proj, session_name)
             elif proj and proj.exists():
@@ -242,7 +242,10 @@ def _run_session(*, name: str | None, use_shell: bool, prompt: str | None) -> No
                 session_dir = SESSIONS_DIR / proj.name / session_name
                 session_dir.mkdir(parents=True, exist_ok=True)
             else:
-                # No valid project — general named session
+                # Project doesn't exist or not in a project dir
+                if proj and not proj.exists():
+                    print_error(f"Project directory not found: {proj}")
+                    sys.exit(1)
                 proj = None
                 session_dir = SESSIONS_DIR / "general" / session_name
                 session_dir.mkdir(parents=True, exist_ok=True)
@@ -265,7 +268,7 @@ def _run_session(*, name: str | None, use_shell: bool, prompt: str | None) -> No
         sys.exit(run_container(command, project=project))
     else:
         # Unnamed general — transient working dir
-        suffix = _hash_suffix()
+        suffix = hash_suffix()
         session_dir = SESSIONS_DIR / "general" / suffix
         session_dir.mkdir(parents=True, exist_ok=True)
         try:
@@ -337,7 +340,7 @@ def _remove_one_session(name: str, force: bool) -> None:
 
     # Check for running container
     cn = container_name_for_session(proj, session_name)
-    if _docker_output("ps", "-q", "--filter", f"name=^/{cn}$"):
+    if docker_output("ps", "-q", "--filter", f"name=^/{cn}$"):
         print_error(f"Cannot remove — session [bright_blue]{session_name}[/bright_blue] is running")
         sys.exit(1)
 
@@ -507,9 +510,9 @@ def status(as_json: bool) -> None:
         *[(m["exists"], m["path"], "missing" if not m["exists"] else "") for m in mounts_data]
     )
 
-    from archie.docker import _resolve_brain_dir
+    from archie.docker import resolve_brain_dir
 
-    brain_dir = _resolve_brain_dir()
+    brain_dir = resolve_brain_dir()
     section("Brain")
     if brain_dir.exists():
         contexts = sorted(

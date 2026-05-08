@@ -315,9 +315,9 @@ def _deep_merge(base: dict, override: dict) -> dict:
 
 def _deploy_seeds() -> None:
     """Copy seed files to brain if they don't already exist."""
-    from archie.docker import _read_ak_config, _resolve_brain_dir
+    from archie.docker import _read_ak_config, resolve_brain_dir
 
-    brain_dir = _resolve_brain_dir()
+    brain_dir = resolve_brain_dir()
     if not brain_dir.exists():
         return
 

@@ -42,7 +42,7 @@ def _docker(*args: str, capture: bool = False) -> subprocess.CompletedProcess:
     )
 
 
-def _docker_output(*args: str) -> str:
+def docker_output(*args: str) -> str:
     """Run a docker command and return stripped stdout."""
     return _docker(*args, capture=True).stdout.strip()
 
@@ -63,7 +63,7 @@ def _read_ak_config() -> dict:
     return {}
 
 
-def _resolve_brain_dir() -> Path:
+def resolve_brain_dir() -> Path:
     """Read brain dir from agent-kit config, fall back to default."""
     brain = _read_ak_config().get("brain", {})
     brain_dir = brain.get("dir") if isinstance(brain, dict) else None
@@ -75,7 +75,7 @@ def _resolve_brain_dir() -> Path:
 # --- Session helpers ---
 
 
-def _hash_suffix() -> str:
+def hash_suffix() -> str:
     """Generate a short hash for unnamed sessions."""
     return hashlib.sha1(str(time.time_ns()).encode()).hexdigest()[:5]
 
@@ -89,7 +89,7 @@ def validate_session_name(name: str) -> None:
         raise SystemExit(1)
 
 
-def _has_git(path: Path) -> bool:
+def has_git(path: Path) -> bool:
     """Check if a directory has a git repo."""
     return (path / ".git").is_dir()
 
@@ -336,7 +336,7 @@ def list_sessions() -> list[dict]:
 
 def image_info() -> dict | None:
     """Get sandbox image info. Returns None if image doesn't exist."""
-    output = _docker_output("images", IMAGE_NAME, "--format", "{{.CreatedSince}}\t{{.Size}}")
+    output = docker_output("images", IMAGE_NAME, "--format", "{{.CreatedSince}}\t{{.Size}}")
     if not output:
         return None
     created, size = output.splitlines()[0].split("\t")
@@ -345,7 +345,7 @@ def image_info() -> dict | None:
 
 def list_containers() -> list[dict]:
     """List running archie containers."""
-    output = _docker_output(
+    output = docker_output(
         "ps",
         "--filter",
         f"name={CONTAINER_PREFIX}",
@@ -428,12 +428,12 @@ def run_container(
     if session_name:
         container_name = container_name_for_session(project, session_name)
     elif project:
-        suffix = _hash_suffix()
+        suffix = hash_suffix()
         container_name = (
             f"{CONTAINER_PREFIX}{_sanitize_name(tool_name)}-{_sanitize_name(project.name)}-{suffix}"
         )
     else:
-        suffix = _hash_suffix()
+        suffix = hash_suffix()
         container_name = f"{CONTAINER_PREFIX}general-{suffix}"
 
     from archie.output import display_header
@@ -452,7 +452,7 @@ def run_container(
         args.extend(["-v", f"{session_dir}:{container_workspace}", "-w", container_workspace])
 
     # Mount brain (always read-write)
-    brain_dir = _resolve_brain_dir()
+    brain_dir = resolve_brain_dir()
     if brain_dir and brain_dir.exists():
         container_brain = str(brain_dir).replace(host_home, container_home)
         args.extend(["-v", f"{brain_dir}:{container_brain}"])
