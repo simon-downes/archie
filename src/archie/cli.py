@@ -232,7 +232,7 @@ def _run_session(
             command = ["/bin/bash"]
     else:
         command = ["kiro-cli", "chat", "--agent", "archie"]
-        if background or not sys.stdin.isatty():
+        if background or not sys.stdout.isatty():
             command.append("--no-interactive")
         if prompt:
             command.append(prompt)
