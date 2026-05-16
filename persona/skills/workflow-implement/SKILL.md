@@ -106,7 +106,10 @@ Use conventional commit format (see tool-git skill).
 
 After each milestone:
 - Report completion to user with a brief summary
-- Confirm before proceeding to next milestone
+- Proceed immediately to the next milestone
+
+Do not ask for confirmation between milestones — maintain momentum. If something
+unexpected arises that changes the plan's assumptions, stop and discuss.
 
 ## 3. Complete Implementation
 
@@ -117,7 +120,9 @@ When all milestones are done:
    (or nearest equivalent) using `tool-issues`.
 3. If the plan is a local file, move it to a `done/` subdirectory alongside it
    (e.g. `plans/done/`)
-4. Ask: "Implementation complete. Would you like to enter Review Mode?"
+4. Run `workflow-review` in full mode across all changes (from branch base to HEAD)
+5. Fix all raised issues including suggestions — unless you specifically disagree
+   with a finding (state why and leave it)
 
 ---
 

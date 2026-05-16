@@ -72,11 +72,19 @@ Examples:
 
 1. **Write Objective** — concise problem description and desired outcome (2-4 sentences)
 
-2. **Analyse Initial Input** — identify core objective, what's stated, what's implied, obvious gaps.
+2. **Capture Context** — document the problem being solved and why. Include:
+   - What triggered this work (user observation, bug, conversation insight)
+   - Key context from the conversation that led to this plan
+   - What was tried or considered before planning began
+   
+   This doesn't need to be exhaustive — just enough that an implementor understands
+   the "why" without needing the original conversation.
+
+3. **Analyse Initial Input** — identify core objective, what's stated, what's implied, obvious gaps.
    If the user references an existing issue (e.g. "plan for PLAT-123"), fetch the issue to use
    its title, description, and comments as additional context for planning.
 
-3. **Investigate the Codebase** — before asking the user anything, explore the codebase to answer
+4. **Investigate the Codebase** — before asking the user anything, explore the codebase to answer
    discoverable questions: existing patterns, conventions, dependencies, relevant modules.
    Use `action-analyze-codebase` for unfamiliar repos.
    Also check project documentation (README, CONTRIBUTING, AGENTS.md) and use
@@ -87,17 +95,17 @@ Examples:
    If multiple sources indicate different trackers, prefer: the user's explicit instruction,
    then project config (`ak project --config`), then project documentation.
 
-4. **Resolve the Decision Tree** — systematically walk through each branch of the design space.
+5. **Resolve the Decision Tree** — systematically walk through each branch of the design space.
    For each open question:
    - If answerable from the codebase → resolve it, state what you found
    - If a preference or intent question → ask the user, ONE question at a time, with your
      recommended answer and alternatives
    - Build on previous answers — each resolution may open new branches
 
-5. **Draft Requirements** — use RFC 2119 keywords (MUST/SHOULD/MAY), focus on observable
+6. **Draft Requirements** — use RFC 2119 keywords (MUST/SHOULD/MAY), focus on observable
    behaviour, add testable acceptance criteria, group logically
 
-6. **Iterate Until Approved** — present to user, incorporate feedback, refine until confirmed
+7. **Iterate Until Approved** — present to user, incorporate feedback, refine until confirmed
 
 **Approval Gate:** "Do the objective and requirements look correct?"
 
@@ -208,7 +216,8 @@ See [references/MILESTONES.md](references/MILESTONES.md) for detailed rules and 
 ## Key Principles
 
 - **Plan as artifact** — the plan must be self-contained. An implementing agent in a fresh
-  session with zero context should be able to execute it.
+  session with zero context should be able to execute it. Include the problem context
+  so the implementor understands *why*, not just *what*.
 - **Resolve decisions, don't defer them** — the plan must resolve all dependency, tooling,
   and structural decisions. The implementor should never need to choose a library, decide
   where new code lives, or establish a new pattern.
