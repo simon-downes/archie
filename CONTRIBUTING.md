@@ -159,6 +159,7 @@ in `config.py`. It holds:
 - `env` — environment variables forwarded into containers
 - `credentials` — maps env vars to agent-kit credential paths (`ak.service.field`)
 - `mounts` — additional files/directories mounted into containers
+- `networks` — Docker networks to connect containers to (`auto` or list of names)
 
 Config changes are picked up immediately. Persona changes require `archie install`.
 

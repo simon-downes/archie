@@ -35,6 +35,9 @@ RUN apt-get update && apt-get install -y \
     gnupg \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Chromium (browser engine for agent-browser)
+RUN apt-get update && apt-get install -y chromium && rm -rf /var/lib/apt/lists/*
+
 # Install PHP from Ondřej Surý's repository (latest stable)
 RUN curl -sSLo /tmp/debsuryorg-archive-keyring.deb https://packages.sury.org/debsuryorg-archive-keyring.deb \
     && dpkg -i /tmp/debsuryorg-archive-keyring.deb \
@@ -155,6 +158,15 @@ RUN TF_DOCS_VERSION=$(curl -s https://api.github.com/repos/terraform-docs/terraf
     tar -xzf /tmp/terraform-docs.tar.gz -C /usr/local/bin terraform-docs && \
     chmod +x /usr/local/bin/terraform-docs && \
     rm /tmp/terraform-docs.tar.gz
+
+# Install agent-browser
+RUN case ${TARGETARCH} in \
+        amd64) AB_ARCH="x64" ;; \
+        arm64) AB_ARCH="arm64" ;; \
+    esac && \
+    curl -L "https://github.com/vercel-labs/agent-browser/releases/latest/download/agent-browser-linux-${AB_ARCH}" \
+        -o /usr/local/bin/agent-browser && \
+    chmod +x /usr/local/bin/agent-browser
 
 # Install Scalr CLI
 RUN SCALR_VERSION=$(curl -fsSL https://api.github.com/repos/Scalr/scalr-cli/releases/latest | grep -oP '"tag_name": "\K(.*)(?=")') && \

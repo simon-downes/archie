@@ -1,16 +1,16 @@
 ---
 name: action-memory-update
 description: >
-  Batch extract conversation memories and signals from session history into brain
+  Batch extract conversation memories from distilled session logs into brain
   memory files. Use when asked to "update memory", "catch up", "process conversations",
   or "run memory update".
 ---
 
 # Purpose
 
-Extract conversation history into structured memory files and learning signals.
-This is a batch process — not inline persistence (which happens naturally during
-conversation via the brain guidance).
+Extract conversation history into structured memory files. This is a batch process —
+not inline persistence (which happens naturally during conversation via the brain
+guidance).
 
 ---
 
@@ -29,23 +29,54 @@ conversation via the brain guidance).
 
 # Workflow
 
-## 1. Gather conversations
+## 1. Ensure logs are up to date
 
 ```bash
-python3 ~/.kiro/skills/action-memory-update/scripts/memory-prep.py > /tmp/memory-payload.json
+ak digest
 ```
 
-The script prints a summary to stderr showing conversation count and breakdown by
-date/project/turns. If no conversations are found, stop here.
+## 2. Identify sessions to process
 
-## 2. Summarise into memory files
+List distilled logs and compare against existing memory files:
 
-For each conversation, produce or update a memory file.
+```bash
+ls ~/.archie/brain/_archie/logs/
+ls ~/.archie/brain/_archie/memory/
+```
+
+Memory files use the format `<date>-<project>-<session_id_short>.md` where
+`session_id_short` is the first 4 characters of the conversation session ID.
+
+For each distilled log, check the corresponding memory file:
+- **No memory file exists** → process all turns (new session)
+- **Memory file exists but distilled log is newer** → process only turns with
+  `when` timestamp after the memory file's modification time (append new content)
+- **Memory file exists and is up to date** → skip
+
+Skip sessions with very few turns (1-2) unless they contain decisions or actions.
+
+## 3. Summarise into memory files
+
+For each session to process, read the distilled log (or just the new turns for
+append) and produce/update a memory file.
+
+The distilled log contains: user messages (verbatim), assistant reasoning text
+(tool blocks already stripped), and tool call metadata. This is the input for
+summarisation — no need to process raw conversation files.
+
+**For new sessions:** read all turns, produce the full memory file.
+
+**For appending:** read only turns after the memory file's mtime, produce a summary
+of the new content, and append it to the existing file under new topic headings.
 
 **Location:** `_archie/memory/` in the brain
 
-**Filename:** `<date>-<project>.md` (one file per day per project, append if exists).
-For general (non-project) sessions: `<date>-<first 4 chars of conversation_id>.md`.
+**Filename:** `<date>-<project>-<session_id_short>.md`
+
+Where:
+- `date` is from the log's `started` field (YYYY-MM-DD)
+- `project` is from the log's `project` field
+- `session_id_short` is the first 4 characters of the `session_id`
 
 **Frontmatter:**
 ```yaml
@@ -81,62 +112,33 @@ CURRENT STATUS: All features implemented. Memory pipeline operational.
 - Skip: routine file reads, debugging steps, greetings, small talk
 - Tags should include the project name, relevant domains, and key topics
 
-## 3. Update watermark
+**What to preserve (memory should answer most questions without needing logs):**
+- Specific findings: exact numbers, names, IPs, error messages, measurements
+- Decisions AND rejected alternatives with reasoning ("considered X, rejected because Y")
+- Open questions and unresolved items left for future sessions
+- Dependencies and blockers ("blocked on X", "needs Y merged first")
+- External references: PR links, issue IDs, Notion pages, brain entries created
 
-After all conversations are processed:
+**What to skip (available in logs if ever needed):**
+- Step-by-step debugging sequences
+- Tool usage details and file contents
+- Routine file reads, greetings, small talk
+- Intermediate attempts that led nowhere (unless the failure itself is informative)
 
-```bash
-python3 ~/.kiro/skills/action-memory-update/scripts/memory-prep.py \
-  --set-watermark <watermark_from_payload>
-```
-
-## 4. Detect and record signals
-
-While summarising each conversation, identify learning signals — moments where:
-- The user corrected a mistake or misunderstanding
-- An approach failed and required a different strategy
-- A tool or API behaved unexpectedly
-- An assumption proved wrong
-
-For each signal worth recording:
-1. Determine the type: `correction`, `failure`, or `pattern` (recurring issue)
-2. Write a concise, actionable summary — what went wrong and what the correct approach is
-3. Assign a category (api-integration, configuration, implementation, architecture, behaviour, etc.)
-
-Append to `_archie/signals.yaml`:
-
-```yaml
-- timestamp: 2026-04-19
-  project: archie
-  type: correction
-  category: api-integration
-  summary: "Jira scoped tokens use Basic auth at api.atlassian.com, not Bearer"
-```
-
-**What makes a good signal:**
-- Specific and actionable (not "made an error")
-- Captures the correct approach, not just the failure
-- Would prevent the same mistake in future sessions
-
-**Skip:**
-- Trivial corrections (typos, minor naming preferences)
-- One-off debugging steps that aren't generalisable
-- Signals already present in the file
-
-## 5. Commit
+## 4. Commit
 
 ```bash
 ak brain reindex
-ak brain commit "memory: <date range or summary>" --paths _archie/memory/ --paths _archie/signals.yaml --paths index.yaml
+ak brain commit "memory: <date range or summary>" --paths _archie/memory/ --paths index.yaml
 ```
 
-## 6. Report
+## 5. Report
 
-Summarise: conversations processed, memory files written/updated, signals added.
+Summarise: sessions processed, memory files written, sessions skipped (already processed
+or too short).
 
 ---
 
 # Batching
 
 For many conversations, delegate to subagents grouped by project (max 4 concurrent).
-Update watermark only after all complete.

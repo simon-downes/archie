@@ -440,6 +440,7 @@ def run_container(
     mounts = resolve_mounts(config)
     env = resolve_env(config)
     creds = resolve_credentials(config)
+    networks = _resolve_networks(config)
 
     host_home = str(Path.home())
     container_home = f"/home/{HOST_USERNAME}"
@@ -491,9 +492,35 @@ def run_container(
     for host_path, container_mount in mounts:
         args.extend(["-v", f"{host_path}:{container_mount}"])
 
+    # Connect to configured networks
+    for net in networks:
+        args.extend(["--network", net])
+
     args.extend([IMAGE_NAME, *command])
 
     try:
         return _docker(*args).returncode
     except KeyboardInterrupt:
         return 130
+
+
+def _resolve_networks(config: dict) -> list[str]:
+    """Resolve network configuration to a list of network names to connect.
+
+    Config values:
+    - "auto": connect to all user-defined Docker networks
+    - list: connect to specific named networks
+    - empty/omitted: don't connect to anything
+    """
+    networks_cfg = config.get("networks", [])
+
+    if networks_cfg == "auto":
+        output = docker_output("network", "ls", "--filter", "type=custom", "--format", "{{.Name}}")
+        if not output:
+            return []
+        return output.splitlines()
+
+    if isinstance(networks_cfg, list):
+        return [n for n in networks_cfg if isinstance(n, str) and n]
+
+    return []

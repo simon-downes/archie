@@ -46,6 +46,7 @@ DEFAULT_CONFIG = {
         "GOOGLE_CLIENT_ID": "ak.google.client_id",
         "GOOGLE_CLIENT_SECRET": "ak.google.client_secret",
     },
+    "networks": [],
     "mounts": [
         ["~/.archie/persona/agents", "~/.kiro/agents"],
         ["~/.archie/persona/skills", "~/.kiro/skills"],
