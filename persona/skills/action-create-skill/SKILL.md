@@ -227,15 +227,20 @@ Wait for explicit approval before writing.
 
 ### scripts/
 
-Executable code that agents can run.
+Executable code that agents run as part of the skill workflow. Use for deterministic
+logic that should not be improvised by the agent (data processing, identification,
+validation, transformation).
 
 - MUST use Python or Bash
 - Python scripts MUST use uv inline dependency format if dependencies are needed
+- Run via `uv run scripts/<name>.py` (Python) or `bash scripts/<name>.sh` (Bash)
 - Include shebang line, helpful error messages, and edge case handling
 
 ### references/
 
-Additional documentation loaded on demand. Keep files focused — smaller files mean less context usage.
+Supporting documentation, examples, and specifications loaded on demand. Use for
+content that informs the agent's reasoning (format specs, review criteria, templates,
+decision frameworks).
 
 ### assets/
 

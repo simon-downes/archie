@@ -35,94 +35,118 @@ guidance).
 ak digest
 ```
 
-## 2. Identify sessions to process
+## 2. Identify sessions and compute batches
 
-List distilled logs and compare against existing memory files:
+Run the identification script (located alongside this skill):
 
 ```bash
-ls ~/.archie/brain/_archie/logs/
-ls ~/.archie/brain/_archie/memory/
+uv run <skill-dir>/scripts/identify.py
 ```
 
-Memory files use the format `<date>-<project>-<session_id_short>.md` where
-`session_id_short` is the first 4 characters of the conversation session ID.
+Where `<skill-dir>` is the directory containing this SKILL.md file.
 
-For each distilled log, check the corresponding memory file:
-- **No memory file exists** → process (new session)
-- **Memory file exists but distilled log is newer** → process only new turns
-  (append content for turns with `when` after the memory file's mtime)
-- **Memory file exists and is up to date** → skip
+The script outputs JSON to stdout with pre-computed batches and a summary to stderr.
+It also auto-skips trivial sessions (updating `.processed`).
 
-**Filtering:** Skip sessions that are clearly trivial:
-- Total user content across all turns < 100 characters
-- Sessions that are only test/debug commands ("what's 1+1", "exit", "tell me about yourself")
+If the output shows 0 actionable sessions, stop — nothing to do.
 
-When in doubt, process it — a slightly redundant memory file costs nothing, but
-missing a decision or finding is a real loss.
+## 3. Dispatch subagents
 
-## 3. Batch and dispatch
+Process batches in rounds of up to 4 parallel subagents. For each batch, use the
+prompt template below.
 
-Always delegate processing to subagents — even for a single session. This keeps
-the main session context clean and avoids polluting interactive or background
-sessions with log content.
+**Do NOT** parse YAML, count turns, compute filenames, or decide batch sizes — the
+script has already done this.
 
-Follow the Batching section below to size batches and dispatch.
+### Subagent prompt template
 
-## 4. Commit
+```
+Read the "Processing Instructions" section of <skill-path>/SKILL.md — follow its
+conventions exactly.
 
-After all sessions are processed:
+## Extracting session data
+
+Use these yq commands to read log files:
+
+Session metadata:
+  yq '.session_id' <file>
+  yq '.project' <file>
+  yq '.started' <file>
+
+All turns:
+  yq '.turns' <file>
+
+Turn count:
+  yq '.turns | length' <file>
+
+Turns after a timestamp (for delta mode):
+  yq '[.turns[] | select(.when > "<timestamp>")]' <file>
+
+## Sessions to process
+
+<for each file in the batch>
+- <path> | mode: <mode> | expected turns: <turns><if delta> | only after: <processed_at></if>
+</for each>
+
+## Validation
+
+Before writing each memory file, confirm the actual turn count from the file is >=
+the expected turns listed above. If fewer turns exist, report an error for that
+session and do not write a memory file.
+
+## Output
+
+Write memory files to ~/.archie/brain/_archie/memory/
+
+After processing all sessions, output a results line on its own starting with RESULTS:
+
+RESULTS: {"results": [{"session_id": "...", "status": "written|skipped|error", "turns": <actual_count>, "file": "<filename or null>", "reason": "<if skipped/error>"}]}
+
+Do NOT run ak brain reindex or commit. Just write the memory files and output results.
+```
+
+## 4. Update .processed
+
+After each subagent completes, parse the `RESULTS:` line from its output. For each
+result:
+
+- `status: "written"` → add/update entry: `<session_id>\t<turns>\twritten\t<now>`
+- `status: "skipped"` → add/update entry: `<session_id>\t<turns>\tskipped\t<now>`
+- `status: "error"` → do not update `.processed` (will be retried next run)
+
+The `.processed` file lives at `<logs_dir>/.processed` (same directory as the logs).
+
+## 5. Commit
+
+After all batches are processed:
 
 ```bash
 ak brain reindex
 ak brain commit "memory: <date range or summary>" --paths _archie/memory/ --paths index.yaml
 ```
 
-## 5. Report
+## 6. Report
 
-Summarise: sessions processed, memory files written/updated, sessions skipped.
+Summarise: sessions processed, memory files written/updated, sessions skipped, errors.
 
 ---
 
-# Batching
+# .processed File
 
-When processing many sessions, delegate to subagents to maintain quality. A single
-agent processing too many sessions will compress output and lose detail.
-
-## Sizing rules
-
-| Session size | Batch strategy |
-|---|---|
-| Small (<10 turns) | 5 sessions per subagent |
-| Medium/Large (10+ turns) | 1 session per subagent |
-
-Group small sessions of similar size together so subagents take roughly equal time.
-
-## Dispatch
-
-Run up to 4 subagents in parallel. Each subagent gets this prompt:
+Tracks all previously handled sessions. Tab-separated, one session per line:
 
 ```
-Read the "Processing Instructions" section of the memory update skill at
-<path-to-this-skill>/SKILL.md — follow its conventions exactly.
-
-Process these session logs into memory files:
-- <path/to/log1.yaml>
-- <path/to/log2.yaml>
-
-Write each memory file to ~/.archie/brain/_archie/memory/<date>-<project>-<session_id_short>.md
-where session_id_short is the first 4 chars of the session_id field in the YAML.
-
-Do NOT run ak brain reindex or commit. Just write the memory files.
+<session_id>\t<turns>\t<status>\t<processed_at>
 ```
 
-Replace `<path-to-this-skill>` with the actual filesystem path to this skill file.
+Fields:
+- `session_id` — full UUID from the log's `session_id` field
+- `turns` — turn count at time of processing
+- `status` — `written` or `skipped`
+- `processed_at` — ISO timestamp of when it was processed
 
-## Execution
-
-1. Precompute all batches and group into rounds of 4
-2. Execute each round (4 parallel subagents)
-3. After all rounds complete, verify output (spot-check a few files)
-4. Reindex and commit once
+The identification script reads this to determine what's new, what's a delta, and
+what's already handled.
 
 ---
 
@@ -133,7 +157,7 @@ Subagents should read only this section.
 
 ## Input
 
-Distilled session logs (YAML files in `~/.archie/brain/_archie/logs/`). Each contains:
+Distilled session logs (YAML files). Each contains:
 - `session_id` — unique conversation identifier
 - `project` — project name or "general"
 - `started` — session start timestamp
@@ -150,6 +174,16 @@ Where:
 - `date` — from the log's `started` field (YYYY-MM-DD)
 - `project` — from the log's `project` field
 - `session_id_short` — first 4 characters of `session_id`
+
+## Delta Mode
+
+When processing a delta session (mode: `delta` with a `processed_at` timestamp):
+
+1. Read the existing memory file at the output path above
+2. Extract only turns with `when` after the `processed_at` timestamp
+3. Append new topic sections or extend existing ones — do NOT rewrite existing content
+4. Update the `CURRENT STATUS` section to reflect the latest state
+5. If the new turns are trivial (greetings, no decisions/findings), skip the session
 
 ## Format
 
