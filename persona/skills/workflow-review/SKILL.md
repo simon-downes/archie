@@ -171,9 +171,13 @@ Merge findings from qa-runner, code-reviewer, and plan alignment into a single r
 If the verdict is APPROVE or APPROVE WITH SUGGESTIONS and the work is on a feature branch:
 - Create a pull request using `tool-git` (load the source provider reference)
 - If the plan came from an issue tracker, include the issue identifier in the PR body
-- Use `tool-slack` to send a PR notification (no-op if Slack is unconfigured)
 - The issue should already be in "In Review" (set by workflow-implement) — no status
   change needed. PR merge handles the final transition.
+
+**Post-PR actions:** After creating the PR, send a Slack notification with the PR title
+and link to the project's configured channel (refer to `# Available Tools`). Message
+format: `<PR title> <<url>|#<number>>`. If Slack is not configured for the project or
+the notification fails, skip silently — notifications are informational, not blocking.
 
 If issue operations fail, warn and continue.
 

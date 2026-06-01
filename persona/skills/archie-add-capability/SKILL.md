@@ -68,7 +68,7 @@ When adding a capability, determine where it belongs:
 - Not reusable enough to warrant a CLI module
 
 Many capabilities span both: agent-kit provides the data access, archie skills provide
-the reasoning. For example, Notion ingestion uses `ak notion` for reading pages and an
+the reasoning. For example, Notion ingestion uses the Notion integration for reading pages and an
 archie skill for extracting and routing knowledge.
 
 ---

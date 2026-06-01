@@ -17,7 +17,7 @@ creating new entries or merging into existing ones. Handles single-topic files
 
 # When to Use
 
-- Files are waiting in `_raw/` (check with `ls` or `ak brain status`)
+- Files are waiting in `_raw/` (check with `ls`)
 - User asks to process raw files or ingest content
 - After `--to-inbox` sends files to the raw directory
 
@@ -61,10 +61,8 @@ Identify each discrete piece of information and its destination.
 
 ### c. Check for duplicates
 
-For each identified entity:
-```bash
-ak brain search "<name or topic>"
-```
+For each identified entity, search your brain for existing entries on that topic
+(refer to `# Available Tools`).
 
 If a match exists → merge new information into the existing file.
 If no match → create a new file.
@@ -101,12 +99,8 @@ rm ~/.archie/brain/_raw/<filename>
 
 ## 3. Reindex and commit
 
-After processing all files:
-
-```bash
-ak brain reindex
-ak brain commit "brain: ingest <summary>" --paths <all-modified-files> --paths index.yaml
-```
+After processing all files, reindex the brain and commit all modified files
+(refer to `# Available Tools`).
 
 ## 4. Report
 

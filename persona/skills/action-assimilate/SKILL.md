@@ -74,10 +74,8 @@ Output: a list of capabilities, each with a name and file list.
 
 For each capability, find our counterpart:
 
-1. **Search the brain** for the improvement file:
-   ```bash
-   ak brain search "<capability domain>" --limit 5
-   ```
+1. **Search the brain** for the improvement file — search for the capability domain
+   (refer to `# Available Tools`).
    Look for results in `projects/archie/improvements/` — these are the improvement files.
    If no improvement file exists yet, one will be created in step 5.
 
@@ -155,11 +153,8 @@ For each subagent that produced results:
 3. **Update provenance** — add the source to the `sources` frontmatter list with today's date.
    Evolve flat source lists (legacy format) to the name+date format on update.
 
-4. **Commit:**
-   ```bash
-   ak brain reindex
-   ak brain commit "brain: assimilate <source> into <domain> improvements" --paths <files> --paths index.yaml
-   ```
+4. **Commit:** Reindex the brain and commit the modified files
+   (refer to `# Available Tools`).
 
 ## 6. Report
 

@@ -52,7 +52,7 @@ Provides operational guidance for using a specific CLI tool or system.
 
 **Scope:** One tool or closely related tool family (e.g., git + source provider, not "all version control")
 
-**Examples:** `tool-git`, `tool-issues`, `tool-aws`
+**Examples:** `tool-git`, `tool-aws`
 
 ---
 

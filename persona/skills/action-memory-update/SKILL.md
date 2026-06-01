@@ -31,9 +31,7 @@ guidance).
 
 ## 1. Ensure logs are up to date
 
-```bash
-ak digest
-```
+Ensure distilled logs are up to date by running the digest tool (refer to `# Available Tools`).
 
 ## 2. Identify sessions and compute batches
 
@@ -102,7 +100,7 @@ After processing all sessions, output a results line on its own starting with RE
 
 RESULTS: {"results": [{"session_id": "...", "status": "written|skipped|error", "turns": <actual_count>, "file": "<filename or null>", "reason": "<if skipped/error>"}]}
 
-Do NOT run ak brain reindex or commit. Just write the memory files and output results.
+Do NOT run brain reindex or commit. Just write the memory files and output results.
 ```
 
 ## 4. Update .processed
@@ -118,12 +116,8 @@ The `.processed` file lives at `<logs_dir>/.processed` (same directory as the lo
 
 ## 5. Commit
 
-After all batches are processed:
-
-```bash
-ak brain reindex
-ak brain commit "memory: <date range or summary>" --paths _archie/memory/ --paths index.yaml
-```
+After all batches are processed, reindex the brain and commit the memory files
+(refer to `# Available Tools`).
 
 ## 6. Report
 

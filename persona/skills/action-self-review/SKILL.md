@@ -35,9 +35,7 @@ changes — not a report.
 
 ## 1. Gather distilled logs
 
-```bash
-ak digest  # ensure logs are up to date
-```
+Ensure distilled logs are up to date by running the digest tool (refer to `# Available Tools`).
 
 Read distilled session logs from `_archie/logs/` for the analysis period.
 
@@ -209,10 +207,7 @@ tags: [self-improvement, review]
 
 ## 6. Commit
 
-```bash
-ak brain reindex
-ak brain commit "review: self-review <date>" --paths _archie/reviews/ --paths _archie/signals.yaml --paths index.yaml
-```
+Reindex the brain and commit the review and signals files (refer to `# Available Tools`).
 
 ## 7. Report
 

@@ -50,14 +50,16 @@ For each milestone, work through these steps:
 ### Setup (first milestone only)
 
 If the plan came from an issue tracker:
-- Update the issue status to "In Progress" (or nearest equivalent) using `tool-issues`
 - Create a branch from the default branch: `<user>/<ISSUE-KEY>-<description>`
 
 If the plan is a local file, create a branch: `<user>/<plan-number>-<description>`
 (e.g. `simon/001-rate-limiting`).
 
-Use `ak project --config` to resolve the project config, then use `tool-issues` for
-issue operations. If no issue tracker is configured, skip issue operations silently.
+**Post-start actions:** After creating the branch, update the issue status to
+"In Progress" (or nearest equivalent) if an issue tracker is configured for the project.
+Determine the project configuration and issue tracker provider (refer to `# Available Tools`).
+If no tracker is configured, skip silently — issue operations are supportive, not blocking.
+If the update fails, warn and continue.
 
 ### A. Understand the Context
 
@@ -117,7 +119,8 @@ When all milestones are done:
 
 1. Summarise deliverables to user
 2. If the plan came from an issue tracker, update the issue status to "In Review"
-   (or nearest equivalent) using `tool-issues`.
+   (or nearest equivalent). Determine the project configuration and issue tracker
+   provider (refer to `# Available Tools`). If the update fails, warn and continue.
 3. If the plan is a local file, move it to a `done/` subdirectory alongside it
    (e.g. `plans/done/`)
 4. Run `workflow-review` in full mode across all changes (from branch base to HEAD)

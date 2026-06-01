@@ -18,13 +18,11 @@ the plan's Objective section.
 
 ## Operations
 
-Refer to `tool-issues` for the appropriate operations for the configured issue tracker.
-
-The key operations are:
+Determine the project configuration to identify the issue tracker provider
+(refer to `# Available Tools`). The key operations are:
 - **Create issue** with title and description (plan content)
 - **Update issue description** (to revise the plan)
 - **Read issue** (to load the plan for implementation)
 - **Update issue status** (to reflect workflow progress: "In Progress", "In Review")
 
-Use `tool-issues` to perform these operations. The skill dispatches to the correct
-provider based on project config.
+If no issue tracker is configured, skip issue operations silently — this is not an error.

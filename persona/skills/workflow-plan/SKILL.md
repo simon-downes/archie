@@ -49,7 +49,7 @@ existing number and increment.
 
 **Determining the project root:**
 1. The nearest ancestor directory containing `.git` (handles sub-projects with own repos)
-2. The output of `ak project` (handles projects outside the git root)
+2. Determine the project root from the project detection tool (refer to `# Available Tools`)
 3. If neither is available, ask the user
 
 When working in a sub-project (e.g. `agent-kit/` inside `archie/`), the sub-project's
@@ -87,13 +87,13 @@ Examples:
 4. **Investigate the Codebase** — before asking the user anything, explore the codebase to answer
    discoverable questions: existing patterns, conventions, dependencies, relevant modules.
    Use `action-analyze-codebase` for unfamiliar repos.
-   Also check project documentation (README, CONTRIBUTING, AGENTS.md) and use
-   `ak project --config` to resolve the project config. If an issue tracker is
-   configured (`brain.issues.provider`), note it for use after plan approval. If no
+   Also check project documentation (README, CONTRIBUTING, AGENTS.md) and determine
+   the project configuration (refer to `# Available Tools`). If an issue tracker is
+   configured (`issues.provider`), note it for use after plan approval. If no
    tracker is configured, skip issue tracking silently.
 
    If multiple sources indicate different trackers, prefer: the user's explicit instruction,
-   then project config (`ak project --config`), then project documentation.
+   then project configuration, then project documentation.
 
 5. **Resolve the Decision Tree** — systematically walk through each branch of the design space.
    For each open question:
@@ -202,10 +202,10 @@ See [references/MILESTONES.md](references/MILESTONES.md) for detailed rules and 
 **Approval Gate:** "Here is the complete plan. Shall we move to Implementation Mode?"
 
 5. **Persist the plan:**
-   - **With tracker:** if an issue tracker was identified via `ak project --config`,
-     use `tool-issues` to create or update the issue with the full plan as the issue
-     description. If an existing issue was referenced, update its description. If no
-     existing issue, create one with the plan title.
+   - **With tracker:** if an issue tracker was identified via the project configuration,
+     create or update the issue with the full plan as the issue description
+     (refer to `# Available Tools`). If an existing issue was referenced, update its
+     description. If no existing issue, create one with the plan title.
      The issue identifier is the plan identifier — no local file is created.
      If the issue operation fails, fall back to a local file.
    - **Without tracker:** write the plan to a local file in `./plans/` (see Planning
