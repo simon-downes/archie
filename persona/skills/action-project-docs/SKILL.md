@@ -48,7 +48,7 @@ an **umbrella repo** — a top-level project that groups independent sub-project
 
 - **Umbrella repo docs**: describe the collection, relationships between sub-projects, and
   shared setup. Do not document sub-project internals — each sub-project owns its own docs.
-- **Sub-project docs**: when the user specifies a sub-project ("update agent-kit's README"),
+- **Sub-project docs**: when the user specifies a sub-project (e.g. "update the auth module's README"),
   scope analysis and documentation to that sub-directory. Treat it as an independent project.
 - **Standard repo**: no nested git repos — treat as a single project.
 

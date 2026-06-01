@@ -52,7 +52,7 @@ existing number and increment.
 2. Determine the project root from the project detection tool (refer to `# Available Tools`)
 3. If neither is available, ask the user
 
-When working in a sub-project (e.g. `agent-kit/` inside `archie/`), the sub-project's
+When working in a sub-project (e.g. a nested module inside a monorepo), the sub-project's
 `.git` takes precedence — plans go in the sub-project's `./plans/`.
 
 **Confirm the plan location** before writing when the project root is ambiguous or when
@@ -60,7 +60,7 @@ working in a sub-project.
 
 Examples:
 - `./plans/001-rate-limiting.md`
-- `./plans/002-agent-kit-linear.md`
+- `./plans/002-linear-integration.md`
 
 ---
 

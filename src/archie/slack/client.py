@@ -132,7 +132,7 @@ class SlackClient:
         if not data.get("ok"):
             error = data.get("error", "unknown error")
             if error in ("token_revoked", "token_expired", "invalid_auth", "not_authed"):
-                raise AuthError(f"Slack auth failed: {error} — run 'ak auth login slack'")
+                raise AuthError(f"Slack auth failed: {error} — run 'archie auth login slack'")
             raise ValueError(f"Slack API error: {error}")
         return data
 

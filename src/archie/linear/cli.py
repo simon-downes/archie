@@ -21,7 +21,7 @@ def _get_client() -> LinearClient:
 
     key = get_field("linear", "token") or os.environ.get("LINEAR_TOKEN")
     if not key:
-        raise AuthError("no Linear credentials — run 'ak auth set linear token'")
+        raise AuthError("no Linear credentials — run 'archie auth set linear token'")
     return LinearClient(key)
 
 

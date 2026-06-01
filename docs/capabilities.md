@@ -156,18 +156,20 @@ defaults, and generates code that matches your module collection's conventions.
 
 ## Integrations
 
-Archie connects to external services through agent-kit. Available integrations depend
-on which credentials are configured.
+Archie connects to external services via built-in CLI subcommands. Available integrations
+depend on which credentials are configured.
 
 | Service | What Archie Can Do |
 |---------|--------------------|
 | **GitHub** | Create PRs, review PRs, branch management, CI status |
 | **Linear** | Create/update issues, track status, load plans from issues |
+| **Jira** | Create/update issues, transitions, attachments |
 | **Notion** | Search and read pages (used as a research source) |
-| **Slack** | Send PR notifications to a channel |
+| **Slack** | Read channels, search messages, send notifications |
+| **Google** | Read mail, calendar, and drive files |
 | **AWS** | Credentials forwarded into the sandbox for infrastructure work |
 
-Issue tracking (Linear or GitHub Issues) is configured per-project. Archie detects
+Issue tracking (Linear or Jira) is configured per-project. Archie detects
 the provider from project config and adapts automatically. If no tracker is configured,
 issue operations are skipped silently — nothing breaks.
 
@@ -209,7 +211,7 @@ Rebase workflow for syncing with main.
 ### Add a Capability
 
 For adding new features to the Archie platform itself. Archie reads its own architecture,
-plans the work, implements across both codebases (archie + agent-kit), reviews, and
+plans the work, implements, reviews, and
 submits a PR — end to end.
 
 **Example prompts:**

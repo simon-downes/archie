@@ -15,7 +15,8 @@ git clone <repo-url>
 cd archie
 
 uv tool install -e .
-archie install
+archie init
+archie build
 archie status
 ```
 
@@ -27,94 +28,141 @@ archie/
 │   ├── agents/                  # Agent configs (JSON) — orchestrator + subagents
 │   ├── skills/                  # Layered knowledge modules
 │   ├── prompts/                 # Subagent prompts + build-signals.py
-│   ├── seeds/                   # Default brain files (soul.md, tools.md)
-│   └── guidance/                # Steering files (local mode)
-├── src/archie/                  # Platform capabilities (Python CLI)
-│   ├── cli.py                   # Click CLI — archie, shell, install, build, status
-│   ├── config.py                # Config loading, project discovery, status checks
+│   └── guidance/                # Steering files (tools.md, LOCAL.md)
+├── src/archie/                  # Unified Python CLI
+│   ├── cli.py                   # Click CLI — main group + session commands
+│   ├── config.py                # Config loading (~/.archie/config.yaml)
 │   ├── docker.py                # Container operations (build, run, list)
 │   ├── output.py                # Rich terminal output, themed banner
-│   └── auth/
-│       ├── __init__.py          # Minimal — credential store moved to agent-kit
-│       └── inject.py            # Resolves ak.* credential paths for container injection
+│   ├── errors.py                # JSON output + error handling for agent commands
+│   ├── init.py                  # archie init — one-time setup
+│   ├── project.py               # Project detection
+│   ├── mcp.py                   # MCP server utilities
+│   ├── auth/                    # Credential management + OAuth
+│   ├── brain/                   # Brain operations (search, index, git, refs)
+│   ├── linear/                  # Linear integration
+│   ├── jira/                    # Jira integration
+│   ├── notion/                  # Notion integration
+│   ├── slack/                   # Slack integration
+│   ├── google/                  # Google Workspace integration
+│   └── digest/                  # Digest generation
 ├── sandbox/
-│   └── Dockerfile               # Sandbox image (Debian + dev tools)
-├── agent-kit/                   # Separate git repo — CLI toolkit for SaaS APIs
-├── docs/
-│   ├── vision.md                # Design rationale, principles, phasing
-│   └── brain.md                 # How Archie uses the second brain
+│   ├── Dockerfile               # Sandbox image (Debian + dev tools)
+│   └── entrypoint.sh            # Container entrypoint (prompt assembly)
 ├── tests/
+├── docs/
+├── plugin.json                  # Skill sharing manifest
 └── pyproject.toml
 ```
 
 ## Architecture
 
-### Two Codebases
+### Output Design
 
-Archie has two codebases with distinct responsibilities:
+Two output modes coexist, determined by audience:
 
-- **archie** (this repo) — persona, skills, prompts, sandbox, CLI, config. Everything
-  about how Archie behaves and runs.
-- **agent-kit** (`agent-kit/` subdirectory, separate git repo) — CLI toolkit for
-  structured access to external services and data stores. Credentials, brain management,
-  Notion, Linear, Slack, project detection.
+**Human-focused commands** use Rich (colours, tables, banners, progress):
 
-When adding a capability, determine where it belongs:
+- `archie` (session launch), `archie ls`, `archie rm`
+- `archie init`, `archie install`, `archie build`, `archie status`
+- `archie auth login`, `archie auth status`
 
-| Goes in agent-kit | Goes in archie |
-|--------------------|----------------|
-| Structured CLI access to external services | LLM reasoning, extraction, decision-making |
-| Mechanical operations (no LLM needed) | Archie-specific workflows and orchestration |
-| Reusable by systems other than Archie | Prompt-driven behaviour |
-| Credential management | Skills and persona |
+**Agent-focused commands** output JSON to stdout, errors to stderr:
 
-See [agent-kit CONTRIBUTING.md](agent-kit/CONTRIBUTING.md) for agent-kit conventions.
+- `archie brain *`, `archie linear *`, `archie jira *`
+- `archie notion *`, `archie slack *`, `archie google *`
+- `archie project`, `archie digest`
+
+**Rule:** If the primary consumer is the AI agent (called from within a session), output
+JSON via `output()`. If the primary consumer is the human at a terminal, use Rich.
+
+### Client Class Pattern
+
+Service integrations follow a consistent structure:
+
+```
+src/archie/<service>/
+├── __init__.py          # Empty or minimal
+├── cli.py              # Click group + subcommands (thin layer)
+├── client.py           # Business logic (no CLI, no sys.exit)
+└── resolve.py          # Name → ID resolution helpers (optional)
+```
+
+**Client classes:**
+- Accept credentials in `__init__` (token, API key, etc.)
+- Never read config, env vars, or call `sys.exit()`
+- Raise exceptions on failure (`AuthError`, `AgentKitError`, `httpx.HTTPStatusError`)
+- Return plain data (dicts, lists) — no formatting
+
+**CLI modules:**
+- Construct client via a `_get_client()` helper that reads credentials
+- Call client methods → pass result to `output()`
+- Decorated with `@handle_errors` for clean error handling
+
+### Error Handling
+
+```python
+from archie.errors import AgentKitError, AuthError, handle_errors, output
+
+@linear.command()
+@handle_errors
+def issues() -> None:
+    """List issues."""
+    client = _get_client()
+    output(client.get_issues(filters))
+```
+
+Exception hierarchy:
+- `AgentKitError` — base error (exit 1)
+- `AuthError(AgentKitError)` — credential problems (exit 2)
+- `ConfigError(AgentKitError)` — configuration problems (exit 1)
+- `ScopeError(AgentKitError)` — resource outside access scope (exit 1)
+
+The `@handle_errors` decorator catches these plus `httpx.HTTPStatusError` and exits
+cleanly with an error message to stderr.
 
 ### Credential Flow
 
-Credentials are managed by agent-kit (`ak auth`). Archie's config maps agent-kit
-credential paths to container environment variables:
+Credentials are stored at `~/.archie/credentials.yaml` (0600 permissions). At container
+launch, `inject.py` maps credentials to environment variables via a hardcoded
+`CREDENTIAL_ENV_MAP` and injects them as `-e` flags. Inside the container, client code
+reads from env vars.
 
-```yaml
-credentials:
-  GH_TOKEN: ak.github.token
-  NOTION_TOKEN: ak.notion.access_token
-```
+### Container Workflow
 
-At container launch, `inject.py` reads from `~/.agent-kit/credentials.yaml` and injects
-as `-e` flags. OAuth tokens are auto-refreshed if expired.
-
-### Project Detection
-
-Project directory is configured in agent-kit (`project_dir` in `~/.agent-kit/config.yaml`).
-Archie reads this to determine which directory to mount into the container.
-
-Inside the container, `ak project` resolves the current project and `ak project --config`
-enriches with brain project config (issues provider, slack, etc).
-
-### Container Mounts
-
-The sandbox always mounts:
-- The current project directory (read-write)
-- The brain directory (read-only, or read-write when the project is `archie`)
-- Persona files to kiro-cli paths
-- Agent-kit config directory
-- Kiro-cli data directory
+The sandbox mounts:
+- The archie repo at `/opt/archie` (read-write)
+- `~/.archie/` (read-write — config, credentials, service caches)
+- Brain directory (read-write)
+- Project directory (read-write)
 - User-configured mounts from `~/.archie/config.yaml`
+
+The entrypoint installs archie from the mounted repo (`uv tool install -e /opt/archie`),
+symlinks persona dirs to kiro-cli paths, and assembles the system prompt from brain-resident
+files.
+
+## Adding a Service Integration
+
+1. Create `src/archie/<service>/` with `__init__.py`, `client.py`, `cli.py`
+2. Write the client class — accepts credentials, returns data, raises on error
+3. Write the CLI module — Click group, `_get_client()` helper, `@handle_errors` on commands
+4. Register the group in `src/archie/cli.py`
+5. Add credential mapping to `src/archie/auth/inject.py` if needed
+6. Add tests in `tests/`
 
 ## Persona
 
 ### System Prompt
 
-The system prompt is assembled dynamically at session start by the container entrypoint.
-It concatenates brain-resident files in order: soul, BRAIN.md, memory, signals, tools,
-user profile. The seed versions live in `persona/seeds/` and are deployed to the brain
-on first `archie install`. After deployment, the brain versions are the live copies —
-Archie can evolve them over time.
+The system prompt is assembled by the container entrypoint from brain-resident files.
+The live template is `_archie/soul.md` in the brain, which uses `@` directives to include
+other files:
 
-The soul (`_archie/soul.md` in the brain) contains a "Critical Rules" section — these
-rules counter specific behavioural tendencies in the underlying AI harness (kiro-cli)
-and must be preserved across prompt rewrites. They are functional, not stylistic.
+- `@agent <file>` — include from `<brain>/_archie/<file>`
+- `@user <file>` — include from `<brain>/simon/<file>` (strips frontmatter)
+- `@script <alias>` — run command from config, include stdout
+
+The seed lives at `persona/agents/archie.md` and is deployed to the brain on `archie init`.
 
 ### Skills
 
@@ -128,40 +176,38 @@ Skills follow a layered naming convention:
 | Action   | `action-*`   | Self-contained tasks                        |
 | Archie   | `archie-*`   | Self-referential platform operations        |
 
-`archie-*` skills operate on the archie platform itself. They have implicit knowledge of
-the architecture and compose other skills (plan, implement, review) with archie-specific
-context.
-
-After editing persona files, run `archie install` to deploy to `~/.archie/persona/`.
-The `{{USER}}` placeholder in `persona/agents/archie.json` is templated during install.
-
 ### Adding a Skill
 
 Use the `action-create-skill` skill for guidance on structure, naming, and conventions.
 Skills live in `persona/skills/<name>/SKILL.md` with optional `references/` subdirectory.
+
+After adding a skill, add its path to `plugin.json`.
 
 ## CLI
 
 ### Adding a Command
 
 Built-in commands are defined in `src/archie/cli.py` as Click commands registered on the
-`main` group.
+`main` group. Service subcommands are defined in their own `<service>/cli.py` and imported
+into the main CLI.
 
 Running `archie` with no subcommand launches kiro-cli in the sandbox. Subcommands
-(`install`, `build`, `shell`, `status`) are for platform management.
+(`init`, `install`, `build`, `status`, `ls`, `rm`) are for platform management.
 
 ### Config
 
-`~/.archie/config.yaml` is created by `archie install` with defaults from `DEFAULT_CONFIG`
-in `config.py`. It holds:
+`~/.archie/config.yaml` is created by `archie init`. It holds:
 
+- `brain_dir` — path to the brain directory
+- `project_dir` — path to the projects root
+- `archie_repo` — path to this repo
 - `theme` — banner colour
 - `env` — environment variables forwarded into containers
-- `credentials` — maps env vars to agent-kit credential paths (`ak.service.field`)
 - `mounts` — additional files/directories mounted into containers
-- `networks` — Docker networks to connect containers to (`auto` or list of names)
-
-Config changes are picked up immediately. Persona changes require `archie install`.
+- `networks` — Docker networks to connect containers to
+- `auth` — OAuth provider configuration
+- `projects` — per-project config (issue tracker, slack channel, etc.)
+- `prompt.scripts` — commands for `@script` directive resolution
 
 ### Package Data
 
@@ -169,23 +215,17 @@ Runtime files bundled via `[tool.hatch.build.targets.wheel.force-include]` in `p
 
 - `sandbox/Dockerfile` → `archie/sandbox/Dockerfile`
 - `persona/` → `archie/persona/`
+- `src/archie/auth/providers.yaml` → `archie/auth/providers.yaml`
+- `src/archie/brain/templates` → `archie/brain/templates`
 
 If you add new runtime data files, add a corresponding `force-include` entry.
-
-## Documentation
-
-- `docs/vision.md` — design rationale, principles, and phasing
-- `docs/brain.md` — how Archie uses the second brain
-
-Keep README.md as the user-facing entry point. Keep CONTRIBUTING.md for development
-conventions (primary consumer: `archie-add-capability` skill). Use `docs/` for depth.
 
 ## Code Style
 
 Uses [ruff](https://docs.astral.sh/ruff/) (line length 100, Python 3.11 target).
 
 ```bash
-uv run ruff check src/ && uv run ruff format --check src/
+uv run ruff check src/ tests/ && uv run ruff format --check src/ tests/
 ```
 
 ## Commit Messages
@@ -197,5 +237,6 @@ uv run ruff check src/ && uv run ruff format --check src/
 1. Create a branch from `main`
 2. Make changes
 3. Run ruff check and format
-4. Commit with conventional commit message
-5. Push and create PR
+4. Run tests: `uv run pytest`
+5. Commit with conventional commit message
+6. Push and create PR

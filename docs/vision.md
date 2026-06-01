@@ -51,9 +51,8 @@ the rationale for the chosen approach.
 
 ### Unified UX, Layered Implementation
 
-Archie presents as a single integrated system but is implemented as separable layers. Similar
-to how agent-kit is a separate project for installation purposes but part of the archie
-ecosystem. The brain contexts are separate git repos but part of the platform.
+Archie presents as a single integrated system but is implemented as separable layers. The
+brain is a separate git repo but part of the platform.
 
 ### Session Model
 
@@ -171,7 +170,7 @@ processes it → brain updated → next session has that context.
 
 ### Integrations
 
-Current: `ak notion`, `ak linear`, `ak slack` (webhook), `gh` CLI, `web_fetch`/`web_search`.
+Current: `archie notion`, `archie linear`, `archie slack` (webhook), `gh` CLI, `web_fetch`/`web_search`.
 
 Priority order for new integrations:
 1. Google Drive/Meet — meeting transcripts, shared docs (highest impact)
@@ -224,7 +223,7 @@ other communication goes through the outbox as drafts for manual sending.
 - Brain index and query skill
 - Notion ingestion skill
 - Memory ingestion (kiro DB → brain)
-- Google Drive ingestion (new agent-kit module)
+- Google Drive ingestion
 - Meeting transcript processing
 - Slack read integration
 - Jira integration

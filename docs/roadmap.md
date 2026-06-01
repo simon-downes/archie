@@ -27,7 +27,7 @@ Foundation for multi-session and autonomous work.
    own git worktree. Remove single-session-per-project restriction.
 
 6. **Background tasks** (plan 004) — `archie shell` accepts commands, `archie task` for
-   fire-and-forget work via `ak tasks`.
+   fire-and-forget work.
 
 ## Phase 3: Observability
 

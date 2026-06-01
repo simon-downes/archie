@@ -16,7 +16,6 @@ dev = ["ruff>=0.11.0"]
 
 [project.scripts]
 archie = "archie.cli:main"
-ak = "archie.cli:main"
 
 [build-system]
 requires = ["hatchling"]

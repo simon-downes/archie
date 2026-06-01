@@ -18,7 +18,7 @@ def _get_client() -> SlackClient:
 
     token = get_field("slack", "access_token")
     if not token:
-        raise AuthError("no Slack user token — run 'ak auth login slack'")
+        raise AuthError("no Slack user token — run 'archie auth login slack'")
     webhook_url = get_field("slack", "webhook_url") or os.environ.get("SLACK_WEBHOOK_URL")
     return SlackClient(token, webhook_url=webhook_url)
 

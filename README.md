@@ -21,14 +21,15 @@ your behalf. One integrated assistant — not a collection of tools.
 
 ```bash
 uv tool install git+https://github.com/simon-downes/archie.git
-uv tool install git+https://github.com/simon-downes/agent-kit.git
-archie install
+archie init
 archie build
 ```
 
 See [Getting Started](docs/getting-started.md) for credentials, brain setup, and first run.
 
 ## Commands
+
+### Sessions
 
 | Command | Description |
 |---------|-------------|
@@ -38,10 +39,60 @@ See [Getting Started](docs/getting-started.md) for credentials, brain setup, and
 | `archie --shell` | Interactive shell in the sandbox |
 | `archie ls` | List sessions and statuses |
 | `archie rm [name]` | Remove session working directories |
-| `archie install` | Deploy persona and default config to `~/.archie/` |
+
+### Platform
+
+| Command | Description |
+|---------|-------------|
+| `archie init` | One-time setup (config, credentials, brain) |
+| `archie install` | Deploy persona to `~/.kiro/` (for local use) |
 | `archie build` | Build the sandbox Docker image |
 | `archie build --quick` | Rebuild using Docker cache |
 | `archie status` | Check environment readiness |
+
+### Services
+
+| Command | Description |
+|---------|-------------|
+| `archie brain` | Brain operations (search, read, memory, index, commit, ref) |
+| `archie auth` | Credential management (login, status, set) |
+| `archie linear` | Linear issue tracking |
+| `archie jira` | Jira issue tracking |
+| `archie notion` | Notion pages and databases |
+| `archie slack` | Slack channels and messaging |
+| `archie google` | Google Workspace (mail, calendar, drive) |
+| `archie project` | Project detection and config |
+| `archie digest` | Digest generation |
+
+## Project Structure
+
+```
+archie/
+├── persona/                     # Who Archie is
+│   ├── skills/                  # Layered knowledge modules
+│   ├── agents/                  # Agent configs and definitions
+│   ├── prompts/                 # Subagent prompts + build-signals.py
+│   └── guidance/                # Steering files (tools.md, LOCAL.md)
+├── src/archie/                  # Unified Python CLI
+│   ├── cli.py                   # Main CLI group + session commands
+│   ├── config.py                # Config loading (~/.archie/config.yaml)
+│   ├── docker.py                # Container operations
+│   ├── output.py                # Rich terminal output
+│   ├── errors.py                # JSON output + error handling for agent commands
+│   ├── auth/                    # Credential management + OAuth
+│   ├── brain/                   # Brain operations (search, index, git, refs)
+│   ├── linear/                  # Linear integration
+│   ├── jira/                    # Jira integration
+│   ├── notion/                  # Notion integration
+│   ├── slack/                   # Slack integration
+│   ├── google/                  # Google Workspace integration
+│   └── digest/                  # Digest generation
+├── sandbox/                     # Docker image (Debian + dev tools)
+├── tests/
+├── docs/
+├── plugin.json                  # Skill sharing manifest
+└── pyproject.toml
+```
 
 ## Documentation
 
@@ -50,7 +101,6 @@ See [Getting Started](docs/getting-started.md) for credentials, brain setup, and
 - [Brain](docs/brain.md) — knowledge, memory, and the second brain
 - [Sessions](docs/sessions.md) — project sessions, general sessions, and how they work
 - [Vision & Architecture](docs/vision.md) — design rationale, principles, and phasing
-- [Agent-kit](agent-kit/README.md) — CLI toolkit for SaaS APIs and brain management
 
 ## Development
 
@@ -58,7 +108,8 @@ See [Getting Started](docs/getting-started.md) for credentials, brain setup, and
 git clone <repo-url>
 cd archie
 uv tool install -e .
-archie install
+archie init
+archie build
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development conventions.

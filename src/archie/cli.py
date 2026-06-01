@@ -533,7 +533,7 @@ def status(as_json: bool) -> None:
             (True, "Directory", str(brain_dir)),
             *[(True, ctx, "") for ctx in contexts]
             if contexts
-            else [(False, "No contexts", "run 'ak brain create-context shared'")],
+            else [(False, "No contexts", "run 'archie init'")],
         )
     else:
         status_table((False, "Directory", f"{brain_dir} (not found)"))

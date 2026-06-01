@@ -39,10 +39,8 @@ Before starting, read these files to understand the platform:
 Archie has two codebases:
 
 - **archie** (this repo) — persona, skills, prompts, sandbox, CLI, config
-- **agent-kit** (`agent-kit/` subdirectory, separate git repo) — CLI toolkit for
-  structured access to external services and data stores
 
-Read agent-kit's `CONTRIBUTING.md` when the capability involves agent-kit changes.
+Read the project's `CONTRIBUTING.md` when the capability involves code changes.
 
 ---
 
@@ -50,13 +48,12 @@ Read agent-kit's `CONTRIBUTING.md` when the capability involves agent-kit change
 
 When adding a capability, determine where it belongs:
 
-**Agent-kit** — if the functionality is:
+**CLI modules** (`src/archie/<service>/`) — if the functionality is:
 - Structured CLI access to an external service or data store
 - Mechanical operations that don't require LLM reasoning
-- Reusable by systems other than Archie
 - Examples: SaaS API integrations, brain index queries, credential management
 
-**Archie skills** — if the functionality is:
+**Archie skills** (`persona/skills/`) — if the functionality is:
 - LLM reasoning, extraction, or decision-making
 - Archie-specific workflows or orchestration
 - Prompt-driven behaviour
@@ -67,7 +64,7 @@ When adding a capability, determine where it belongs:
 - Shell pipelines or simple automation
 - Not reusable enough to warrant a CLI module
 
-Many capabilities span both: agent-kit provides the data access, archie skills provide
+Many capabilities span both: CLI modules provide the data access, archie skills provide
 the reasoning. For example, Notion ingestion uses the Notion integration for reading pages and an
 archie skill for extracting and routing knowledge.
 
@@ -90,10 +87,10 @@ Keep this phase short — 5 questions maximum, focus on the most impactful.
 
 Investigate before planning:
 
-- **Codebase** — understand the relevant parts of both codebases. Read existing skills,
+- **Codebase** — understand the relevant parts of the codebase. Read existing skills,
   config, CLI, and docker code as needed. Use `action-analyze-codebase` for unfamiliar areas.
-- **Agent-kit patterns** — if the capability involves agent-kit, read its CONTRIBUTING.md
-  for module structure, error handling, credential, and output conventions.
+- **Conventions** — read the project's CONTRIBUTING.md for module structure, error handling,
+  credential, and output conventions.
 - **Web** — search for relevant documentation, APIs, libraries, or prior art if the
   capability involves external integrations or unfamiliar domains.
 - **URLs** — if the user provides reference URLs, fetch and review them.
@@ -106,9 +103,8 @@ implementation questions.
 Invoke `workflow-plan` to produce a structured plan. The plan should:
 
 - Reference conventions and patterns discovered in research
-- Specify which files need creating/modifying across both codebases
+- Specify which files need creating/modifying
 - Include updating relevant documentation (README, CONTRIBUTING, docs/)
-- Identify which parts go in agent-kit vs archie skills vs scripts
 
 ## 4. Implement
 

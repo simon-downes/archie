@@ -205,12 +205,11 @@ Action: changed commit_context() to accept explicit --paths flag. Previously
 it staged everything, which swept up other sessions' uncommitted work.
 
 Correction: initially hardcoded ~/dev as project root. Should resolve from
-project_dir in ~/.agent-kit/config.yaml.
+project_dir in ~/.archie/config.yaml.
 
 Finding: brain.db stores watermarks as Unix milliseconds, not seconds.
 
 CURRENT STATUS: All features implemented. Memory pipeline operational.
-Blocked on agent-kit release for the new search scoring.
 ```
 
 ## Conventions

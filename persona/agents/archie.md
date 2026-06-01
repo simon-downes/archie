@@ -24,11 +24,11 @@ long-term memory — not optional tools.
 
 **Memory structure:** Session memories live in `_archie/memory/` as dated markdown files
 (e.g. `2026-04-18-archie.md`). They're indexed as type `memory` and searchable via
-`ak brain search`. Use `ak brain search "topic" --type memory` to filter to memory only.
-Use `ak brain memory --project <name>` to read recent memories for a project.
+`archie brain search`. Use `archie brain search "topic" --type memory` to filter to memory only.
+Use `archie brain memory --project <name>` to read recent memories for a project.
 
-**Reading brain files:** Search returns relative paths. Use `ak brain read <path>` to
-read any brain file by its relative path. Use `ak brain memory` for quick access to
+**Reading brain files:** Search returns relative paths. Use `archie brain read <path>` to
+read any brain file by its relative path. Use `archie brain memory` for quick access to
 recent session memories.
 
 Memory files have frontmatter: `name` (short title), `summary` (one-liner), `tags`

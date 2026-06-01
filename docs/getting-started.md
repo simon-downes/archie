@@ -2,23 +2,19 @@
 
 ## 1. Installation
 
-Install both archie and agent-kit:
-
 ```bash
 uv tool install git+https://github.com/simon-downes/archie.git
-uv tool install git+https://github.com/simon-downes/agent-kit.git
 ```
 
 ## 2. Initial Setup
 
-Deploy the persona and default config:
+Run the one-time setup:
 
 ```bash
-archie install
+archie init
 ```
 
-This creates `~/.archie/` with the persona files and a default `config.yaml`. Config
-changes are picked up immediately; persona changes require re-running `archie install`.
+This creates `~/.archie/` with config, credentials, and the brain directory structure.
 
 Build the sandbox image:
 
@@ -31,8 +27,7 @@ CLI utilities. Use `archie build --quick` for subsequent rebuilds using Docker c
 
 ## 3. Credentials
 
-Archie uses [agent-kit](../agent-kit/README.md) for credential management. Each service
-below is optional — skip any you don't use.
+Each service below is optional — skip any you don't use.
 
 ### GitHub
 
@@ -42,7 +37,7 @@ Enables repository operations via the `gh` CLI inside the sandbox.
 2. Store it:
 
 ```bash
-ak auth set github token
+archie auth set github token
 ```
 
 ### Notion
@@ -52,11 +47,10 @@ Enables searching, reading, and writing Notion pages and databases.
 1. Run the OAuth login flow (opens your browser):
 
 ```bash
-ak auth login notion
+archie auth login notion
 ```
 
-Tokens are refreshed automatically when expired. See
-[Notion docs](../agent-kit/docs/notion.md) for access scoping configuration.
+Tokens are refreshed automatically when expired.
 
 ### Linear
 
@@ -66,10 +60,8 @@ Enables issue tracking — querying, creating, and updating issues.
 2. Store it:
 
 ```bash
-ak auth set linear token
+archie auth set linear token
 ```
-
-See [Linear docs](../agent-kit/docs/linear.md) for team and project filtering.
 
 ### Jira
 
@@ -81,12 +73,10 @@ Enables Jira Cloud issue tracking — querying, creating, updating, and transiti
 3. Store credentials:
 
 ```bash
-ak auth set jira email
-ak auth set jira token
-ak auth set jira cloud_id
+archie auth set jira email
+archie auth set jira token
+archie auth set jira cloud_id
 ```
-
-See [Jira docs](../agent-kit/docs/jira.md) for full command reference.
 
 ### Google Workspace
 
@@ -97,12 +87,10 @@ Enables read-only access to Gmail, Calendar, and Google Drive.
 3. Store credentials and authenticate:
 
 ```bash
-ak auth set google client_id
-ak auth set google client_secret
-ak auth login google
+archie auth set google client_id
+archie auth set google client_secret
+archie auth login google
 ```
-
-See [Google Workspace docs](../agent-kit/docs/google.md) for full command reference.
 
 ### Slack
 
@@ -111,18 +99,16 @@ Enables reading channels and searching messages, plus sending notifications.
 **Read access** — requires a Slack app with PKCE OAuth:
 
 ```bash
-ak auth set slack client_id
-ak auth set slack client_secret
-ak auth login slack
+archie auth set slack client_id
+archie auth set slack client_secret
+archie auth login slack
 ```
 
 **Write access** — uses an incoming webhook:
 
 ```bash
-ak auth set slack webhook_url
+archie auth set slack webhook_url
 ```
-
-See [Slack docs](../agent-kit/docs/slack.md) for app setup and full command reference.
 
 ### AWS
 
@@ -131,14 +117,14 @@ Enables AWS CLI operations inside the sandbox.
 If you use `aws-vault` or similar, import credentials from your environment:
 
 ```bash
-aws-vault exec my-profile -- ak auth import aws \
+aws-vault exec my-profile -- archie auth import aws \
   AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
 ```
 
 Otherwise, set them directly:
 
 ```bash
-ak auth set aws access_key_id secret_access_key session_token
+archie auth set aws access_key_id secret_access_key session_token
 ```
 
 ### Scalr
@@ -149,7 +135,7 @@ Enables Scalr CLI operations for infrastructure management.
 2. Store the token and hostname:
 
 ```bash
-ak auth set scalr token hostname
+archie auth set scalr token hostname
 ```
 
 ### Verifying Credentials
@@ -157,7 +143,7 @@ ak auth set scalr token hostname
 Check which credentials are configured:
 
 ```bash
-ak auth status
+archie auth status
 ```
 
 ## 4. Brain Setup
@@ -165,31 +151,12 @@ ak auth status
 The brain is a persistent knowledge base — files on disk in a single git repo.
 See [Brain](brain.md) for structure and usage.
 
-### Initialise
-
-```bash
-ak init
-```
-
-This prompts for your name and agent name, then creates the brain directory structure
-with a convention guide (`BRAIN.md`), user profile skeleton, and agent operational files.
-
-### First Run
-
-```bash
-archie
-```
-
-On first run after install, Archie deploys seed files to the brain (`soul.md`, `tools.md`)
-which form the basis of the system prompt. These are evolvable — Archie can modify them
-over time.
-
-See [agent-kit brain docs](../agent-kit/docs/brain.md) for search, indexing, and
-reference tracking.
+`archie init` creates the brain directory structure with a convention guide (`BRAIN.md`),
+user profile skeleton, and agent operational files.
 
 ## 5. Configure Project Directory
 
-Agent-kit needs to know where your projects live. Edit `~/.agent-kit/config.yaml`:
+Edit `~/.archie/config.yaml` to set your projects root:
 
 ```yaml
 project_dir: ~/dev
@@ -207,22 +174,12 @@ archie
 ```
 
 This launches Archie in the sandbox with your project mounted read-write and the brain
-mounted read-only. Archie has full context of your project and can read from the brain.
+available for context.
 
-From outside a project directory (or from the archie project itself):
-
-```bash
-cd ~/dev/archie
-archie
-```
-
-This starts an Archie session with the brain mounted read-write — used for knowledge
-work, ingestion, planning, and self-extension.
-
-For a named general session (not tied to a project):
+For a named session (isolated working directory):
 
 ```bash
-archie --session research
+archie --name research
 ```
 
 ## 7. Verification
@@ -238,5 +195,5 @@ This shows:
 - Sandbox image state
 - Credential configuration and expiry
 - Mount availability
-- Brain contexts
+- Brain status
 - Active sessions

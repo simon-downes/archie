@@ -17,12 +17,12 @@ SMALL_BATCH_SIZE = 5
 
 
 def load_config() -> tuple[Path, str]:
-    """Read brain dir and agent name from agent-kit config."""
-    config_path = Path.home() / ".agent-kit" / "config.yaml"
+    """Read brain dir and agent name from archie config."""
+    config_path = Path.home() / ".archie" / "config.yaml"
     with open(config_path) as f:
         config = yaml.safe_load(f)
-    brain_dir = Path(config["brain"]["dir"]).expanduser()
-    agent = config["agent"]
+    brain_dir = Path(config.get("brain_dir", "~/.archie/brain")).expanduser()
+    agent = "archie"
     return brain_dir, agent
 
 

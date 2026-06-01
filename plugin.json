@@ -1,0 +1,26 @@
+{
+  "name": "archie",
+  "description": "Personal AI platform — skills for planning, implementation, review, and knowledge management",
+  "version": "1.0.0",
+  "skills": [
+    "persona/skills/action-analyze-codebase",
+    "persona/skills/action-assimilate",
+    "persona/skills/action-brain-ingest",
+    "persona/skills/action-council",
+    "persona/skills/action-create-skill",
+    "persona/skills/action-create-terraform-module",
+    "persona/skills/action-memory-update",
+    "persona/skills/action-project-docs",
+    "persona/skills/action-research",
+    "persona/skills/action-review-plan",
+    "persona/skills/action-self-review",
+    "persona/skills/archie-add-capability",
+    "persona/skills/policy-general-coding",
+    "persona/skills/policy-lang-python",
+    "persona/skills/policy-lang-terraform",
+    "persona/skills/tool-git",
+    "persona/skills/workflow-implement",
+    "persona/skills/workflow-plan",
+    "persona/skills/workflow-review"
+  ]
+}

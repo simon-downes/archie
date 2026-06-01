@@ -36,7 +36,7 @@ def _get_token() -> str:
 
     token = get_field("notion", "access_token") or os.environ.get("NOTION_TOKEN")
     if not token:
-        raise AuthError("no Notion credentials — run 'ak auth set notion access_token'")
+        raise AuthError("no Notion credentials — run 'archie auth set notion access_token'")
     return token
 
 

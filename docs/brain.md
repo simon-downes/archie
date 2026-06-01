@@ -34,23 +34,23 @@ brain/
 ## Setup
 
 ```bash
-ak init
+archie init
 ```
 
-Prompts for user name and agent name, creates the full directory structure with
-a templated `BRAIN.md` convention guide.
+Creates the brain directory structure with a templated `BRAIN.md` convention guide.
 
 ## CLI
 
 | Command | Description |
 |---------|-------------|
-| `ak brain search <terms>` | Multi-term ranked search |
-| `ak brain index` | Query the entity index |
-| `ak brain reindex` | Rebuild index from filesystem |
-| `ak brain commit <msg>` | Stage and commit changes |
-| `ak brain ref <path>` | Record an access (reference tracking) |
-| `ak brain refs` | Query reference data (--top, --stale) |
-| `ak brain status` | Directory info and git status |
+| `archie brain search <terms>` | Multi-term ranked search |
+| `archie brain read <path>` | Read a brain file |
+| `archie brain memory` | Recent session memories |
+| `archie brain index` | Query the entity index |
+| `archie brain reindex` | Rebuild index from filesystem |
+| `archie brain commit <msg>` | Stage and commit changes |
+| `archie brain ref <path>` | Record an access (reference tracking) |
+| `archie brain refs` | Query reference data (--top, --stale) |
 
 ## What Lives Where
 
@@ -61,9 +61,3 @@ a templated `BRAIN.md` convention guide.
 | Agent operational state (signals, memory, soul) | Brain (`_archie/`) |
 | Project-specific context (not code) | Brain (`projects/<name>/`) |
 | Durable reference knowledge | Brain (`knowledge/`) |
-
-## Responsibility Split
-
-- **Agent-kit** provides structure and mechanics: `ak init`, `ak brain search/ref/reindex`
-- **Archie** provides intelligence and lifecycle: skills that decide what to write,
-  memory consolidation, signal extraction, soul evolution

@@ -28,7 +28,7 @@ def _get_client() -> JiraClient:
             missing.append("cloud_id")
         raise AuthError(
             f"missing Jira credentials ({', '.join(missing)}) — "
-            "run 'ak auth set jira email/token/cloud_id'"
+            "run 'archie auth set jira email/token/cloud_id'"
         )
     return JiraClient(email, token, cloud_id)
 

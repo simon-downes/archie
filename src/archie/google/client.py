@@ -18,7 +18,7 @@ class GoogleClient:
     def __init__(self, credentials: dict[str, str]):
         token = credentials.get("access_token")
         if not token:
-            raise AuthError("no Google credentials — run 'ak auth login google'")
+            raise AuthError("no Google credentials — run 'archie auth login google'")
         self._token = token
         self._expires_at = credentials.get("expires_at")
         self._refresh_token = credentials.get("refresh_token")
@@ -154,7 +154,7 @@ class GoogleClient:
 
         if not all([token_endpoint, self._client_id, self._refresh_token]):
             raise AuthError(
-                "missing Google OAuth config or refresh token — run 'ak auth login google'"
+                "missing Google OAuth config or refresh token — run 'archie auth login google'"
             )
 
         print("Refreshing Google token...", file=sys.stderr)

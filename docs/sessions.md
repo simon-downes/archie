@@ -43,7 +43,7 @@ archie --name fix-auth
 From inside a project directory, `--name` clones the project repos into an isolated
 working directory:
 
-- Clones the project repo and any immediate sub-repos (e.g. agent-kit)
+- Clones the project repo into an isolated working directory
 - Working directory: `~/.archie/sessions/<project>/<name>/`
 - Mounted at the container's project path (same as unnamed sessions)
 - Persists between runs — `archie --name fix-auth` resumes where you left off
