@@ -1,0 +1,395 @@
+"""Jira Cloud REST API v3 client."""
+
+from typing import Any
+
+import httpx
+
+
+class JiraClient:
+    """Client for Jira Cloud REST API v3 using scoped API tokens.
+
+    Uses Basic auth (email:token) against api.atlassian.com/ex/jira/{cloud_id}.
+    """
+
+    def __init__(self, email: str, token: str, cloud_id: str):
+        self._client = httpx.Client(
+            base_url=f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3",
+            auth=(email, token),
+            headers={"Accept": "application/json"},
+        )
+
+    # --- Public interface ---
+
+    def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
+        resp = self._client.get(path, params=params)
+        return self._handle(resp)
+
+    def post(self, path: str, json: dict[str, Any] | None = None) -> Any:
+        resp = self._client.post(path, json=json)
+        return self._handle(resp)
+
+    def put(self, path: str, json: dict[str, Any] | None = None) -> Any:
+        resp = self._client.put(path, json=json)
+        return self._handle(resp)
+
+    def post_raw(self, path: str, **kwargs: Any) -> httpx.Response:
+        """POST without JSON encoding — for multipart uploads."""
+        resp = self._client.post(path, **kwargs)
+        return self._handle_response(resp)
+
+    def get_projects(self, *, limit: int = 50) -> list[dict[str, Any]]:
+        data = self.get("/project/search", params={"maxResults": limit})
+        return [
+            {
+                "id": p["id"],
+                "key": p["key"],
+                "name": p["name"],
+                "projectTypeKey": p.get("projectTypeKey"),
+            }
+            for p in data.get("values", [])
+        ]
+
+    def get_project(self, key_or_id: str) -> dict[str, Any]:
+        data = self.get(f"/project/{key_or_id}", params={"expand": "issueTypes"})
+        return {
+            "id": data["id"],
+            "key": data["key"],
+            "name": data["name"],
+            "projectTypeKey": data.get("projectTypeKey"),
+            "issueTypes": [
+                {"id": t["id"], "name": t["name"], "subtask": t.get("subtask", False)}
+                for t in data.get("issueTypes", [])
+            ],
+        }
+
+    def get_statuses(self, project_key: str) -> list[dict[str, Any]]:
+        data = self.get(f"/project/{project_key}/statuses")
+        return [
+            {
+                "issueType": entry["name"],
+                "statuses": [{"id": s["id"], "name": s["name"]} for s in entry.get("statuses", [])],
+            }
+            for entry in data
+        ]
+
+    def search_issues(
+        self,
+        *,
+        jql: str | None = None,
+        project: str | None = None,
+        status: str | None = None,
+        assignee: str | None = None,
+        issue_type: str | None = None,
+        label: str | None = None,
+        created_after: str | None = None,
+        created_before: str | None = None,
+        updated_after: str | None = None,
+        updated_before: str | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        if jql is None:
+            clauses: list[str] = []
+            if project:
+                clauses.append(f'project = "{self._jql_escape(project)}"')
+            if status:
+                clauses.append(f'status = "{self._jql_escape(status)}"')
+            if assignee:
+                clauses.append(f'assignee = "{self._jql_escape(assignee)}"')
+            if issue_type:
+                clauses.append(f'issuetype = "{self._jql_escape(issue_type)}"')
+            if label:
+                clauses.append(f'labels = "{self._jql_escape(label)}"')
+            if created_after:
+                clauses.append(f'created >= "{self._jql_escape(created_after)}"')
+            if created_before:
+                clauses.append(f'created <= "{self._jql_escape(created_before)}"')
+            if updated_after:
+                clauses.append(f'updated >= "{self._jql_escape(updated_after)}"')
+            if updated_before:
+                clauses.append(f'updated <= "{self._jql_escape(updated_before)}"')
+            jql = " AND ".join(clauses) if clauses else "ORDER BY created DESC"
+
+        fields = "summary,status,assignee,priority,issuetype,labels,created,updated"
+        results: list[dict[str, Any]] = []
+        next_token: str | None = None
+        while len(results) < limit:
+            page_size = min(limit - len(results), 100)
+            body: dict[str, Any] = {
+                "jql": jql,
+                "maxResults": page_size,
+                "fields": fields.split(","),
+            }
+            if next_token:
+                body["nextPageToken"] = next_token
+            data = self.post("/search/jql", json=body)
+            results.extend(self._format_issue(i) for i in data.get("issues", []))
+            if data.get("isLast", True):
+                break
+            next_token = data.get("nextPageToken")
+        return results[:limit]
+
+    def get_issue(self, key: str) -> dict[str, Any]:
+        data = self.get(f"/issue/{key}")
+        return self._format_issue_detail(data)
+
+    def create_issue(
+        self,
+        *,
+        project_key: str,
+        summary: str,
+        issue_type: str,
+        description: str | None = None,
+        priority: str | None = None,
+        labels: list[str] | None = None,
+        assignee_id: str | None = None,
+    ) -> dict[str, Any]:
+        fields: dict[str, Any] = {
+            "project": {"key": project_key},
+            "summary": summary,
+            "issuetype": {"name": issue_type},
+        }
+        if description:
+            fields["description"] = text_to_adf(description)
+        if priority:
+            fields["priority"] = {"name": priority}
+        if labels:
+            fields["labels"] = labels
+        if assignee_id:
+            fields["assignee"] = {"accountId": assignee_id}
+
+        data = self.post("/issue", json={"fields": fields})
+        return {"key": data["key"], "id": data["id"], "self": data.get("self")}
+
+    def update_issue(
+        self,
+        key: str,
+        *,
+        summary: str | None = None,
+        description: str | None = None,
+        priority: str | None = None,
+        labels: list[str] | None = None,
+        assignee_id: str | None = None,
+    ) -> dict[str, Any]:
+        fields: dict[str, Any] = {}
+        if summary:
+            fields["summary"] = summary
+        if description:
+            fields["description"] = text_to_adf(description)
+        if priority:
+            fields["priority"] = {"name": priority}
+        if labels is not None:
+            fields["labels"] = labels
+        if assignee_id:
+            fields["assignee"] = {"accountId": assignee_id}
+
+        self.put(f"/issue/{key}", json={"fields": fields})
+        return self.get_issue(key)
+
+    def get_transitions(self, key: str) -> list[dict[str, Any]]:
+        data = self.get(f"/issue/{key}/transitions")
+        return [{"id": t["id"], "name": t["name"]} for t in data.get("transitions", [])]
+
+    def transition_issue(self, key: str, *, transition_id: str) -> dict[str, Any]:
+        self.post(f"/issue/{key}/transitions", json={"transition": {"id": transition_id}})
+        return self.get_issue(key)
+
+    def get_comments(self, key: str) -> list[dict[str, Any]]:
+        data = self.get(f"/issue/{key}/comment")
+        return [
+            {
+                "id": c["id"],
+                "author": (c.get("author") or {}).get("displayName"),
+                "body": adf_to_text(c.get("body")),
+                "created": c.get("created"),
+            }
+            for c in data.get("comments", [])
+        ]
+
+    def create_comment(self, key: str, *, body: str) -> dict[str, Any]:
+        data = self.post(f"/issue/{key}/comment", json={"body": text_to_adf(body)})
+        return {
+            "id": data["id"],
+            "author": (data.get("author") or {}).get("displayName"),
+            "body": adf_to_text(data.get("body")),
+            "created": data.get("created"),
+        }
+
+    def attach_file(self, key: str, filepath: str) -> list[dict[str, Any]]:
+        """Attach a file to an issue. Returns list of created attachments."""
+        from pathlib import Path
+
+        path = Path(filepath)
+        if not path.exists():
+            raise FileNotFoundError(f"file not found: {filepath}")
+
+        with path.open("rb") as f:
+            resp = self.post_raw(
+                f"/issue/{key}/attachments",
+                files={"file": (path.name, f)},
+                headers={"X-Atlassian-Token": "no-check"},
+            )
+
+        attachments = resp.json()
+        return [
+            {
+                "id": a["id"],
+                "filename": a["filename"],
+                "size": a.get("size"),
+                "content": a.get("content"),
+            }
+            for a in attachments
+        ]
+
+    def search_users(self, query: str) -> list[dict[str, Any]]:
+        data = self.get("/user/search", params={"query": query, "maxResults": 10})
+        return [
+            {"accountId": u["accountId"], "displayName": u.get("displayName", "")}
+            for u in data
+            if u.get("accountType") == "atlassian"
+        ]
+
+    # --- Private implementation ---
+
+    def _handle(self, resp: httpx.Response) -> Any:
+        resp = self._handle_response(resp)
+        if resp.status_code == 204 or not resp.content:
+            return {}
+        return resp.json()
+
+    def _handle_response(self, resp: httpx.Response) -> httpx.Response:
+        if resp.status_code in (401, 403):
+            resp.raise_for_status()
+
+        if resp.status_code == 429:
+            raise httpx.HTTPStatusError(
+                "Jira API rate limit exceeded, try again later",
+                request=resp.request,
+                response=resp,
+            )
+
+        if resp.status_code >= 400:
+            self._raise_api_error(resp)
+
+        return resp
+
+    def _raise_api_error(self, resp: httpx.Response) -> None:
+        try:
+            body = resp.json()
+        except Exception:
+            resp.raise_for_status()
+
+        parts: list[str] = []
+        for msg in body.get("errorMessages", []):
+            if msg:
+                parts.append(msg)
+        for field, msg in body.get("errors", {}).items():
+            parts.append(f"{field}: {msg}")
+
+        if parts:
+            raise ValueError("; ".join(parts))
+        resp.raise_for_status()
+
+    def _format_issue(self, issue: dict[str, Any]) -> dict[str, Any]:
+        fields = issue.get("fields", {})
+        return {
+            "key": issue["key"],
+            "summary": fields.get("summary"),
+            "status": (fields.get("status") or {}).get("name"),
+            "assignee": (fields.get("assignee") or {}).get("displayName"),
+            "priority": (fields.get("priority") or {}).get("name"),
+            "issuetype": (fields.get("issuetype") or {}).get("name"),
+            "labels": fields.get("labels", []),
+            "created": fields.get("created"),
+            "updated": fields.get("updated"),
+        }
+
+    def _format_issue_detail(self, issue: dict[str, Any]) -> dict[str, Any]:
+        result = self._format_issue(issue)
+        fields = issue.get("fields", {})
+        result["description"] = adf_to_text(fields.get("description"))
+        result["project"] = (fields.get("project") or {}).get("key")
+        comments = fields.get("comment", {}).get("comments", [])
+        result["comments"] = [
+            {
+                "author": (c.get("author") or {}).get("displayName"),
+                "body": adf_to_text(c.get("body")),
+                "created": c.get("created"),
+            }
+            for c in comments
+        ]
+        return result
+
+    @staticmethod
+    def _jql_escape(value: str) -> str:
+        """Escape a value for use in a JQL quoted string."""
+        return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+# --- ADF helpers ---
+
+
+def adf_to_text(doc: dict[str, Any] | None) -> str:
+    """Extract plain text from an Atlassian Document Format document."""
+    if not doc or not isinstance(doc, dict):
+        return ""
+    return _extract_blocks(doc.get("content", [])).strip()
+
+
+def _extract_blocks(nodes: list[dict[str, Any]], depth: int = 0) -> str:
+    parts: list[str] = []
+    for node in nodes:
+        ntype = node.get("type", "")
+        content = node.get("content", [])
+
+        if ntype == "paragraph":
+            parts.append(_extract_inline(content))
+        elif ntype == "heading":
+            level = node.get("attrs", {}).get("level", 1)
+            parts.append("#" * level + " " + _extract_inline(content))
+        elif ntype in ("bulletList", "orderedList"):
+            for i, item in enumerate(content):
+                prefix = "- " if ntype == "bulletList" else f"{i + 1}. "
+                children = item.get("content", [])
+                if children:
+                    item_text = _extract_blocks(children, depth + 1)
+                    lines = item_text.splitlines()
+                    parts.append(prefix + "\n".join(lines))
+                else:
+                    parts.append(prefix)
+        elif ntype == "codeBlock":
+            parts.append("```\n" + _extract_inline(content) + "\n```")
+        elif ntype == "blockquote":
+            inner = _extract_blocks(content, depth + 1)
+            parts.append("\n".join("> " + line for line in inner.splitlines()))
+        elif content:
+            parts.append(_extract_blocks(content, depth + 1))
+
+    return "\n\n".join(str(p) for p in parts if p)
+
+
+def _extract_inline(nodes: list[dict[str, Any]]) -> str:
+    parts: list[str] = []
+    for node in nodes:
+        if node.get("type") == "text":
+            parts.append(node.get("text", ""))
+        elif node.get("type") == "hardBreak":
+            parts.append("\n")
+        elif "content" in node:
+            parts.append(_extract_inline(node["content"]))
+    return "".join(parts)
+
+
+def text_to_adf(text: str) -> dict[str, Any]:
+    """Convert plain text to minimal ADF document."""
+    paragraphs = []
+    for line in text.split("\n"):
+        if line.strip():
+            paragraphs.append(
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": line}],
+                }
+            )
+    if not paragraphs:
+        paragraphs.append({"type": "paragraph", "content": []})
+    return {"type": "doc", "version": 1, "content": paragraphs}

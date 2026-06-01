@@ -22,7 +22,44 @@ _KIRO_DATA_DIR = (
 )
 
 DEFAULT_CONFIG = {
+    "project_dir": "~/dev",
     "theme": "blue",
+    "auth": {
+        "notion": {"type": "oauth"},
+        "linear": {"type": "static", "fields": ["token"]},
+        "slack": {
+            "type": "oauth",
+            "authorization_endpoint": "https://slack.com/oauth/v2/authorize",
+            "token_endpoint": "https://slack.com/api/oauth.v2.access",
+            "token_path": "authed_user.access_token",
+            "refresh_token_path": "authed_user.refresh_token",
+            "extra_params": {
+                "user_scope": (
+                    "channels:history channels:read groups:history groups:read "
+                    "users:read search:read im:history mpim:history"
+                ),
+            },
+        },
+        "github": {"type": "static", "fields": ["token"]},
+        "aws": {
+            "type": "static",
+            "fields": ["access_key_id", "secret_access_key", "session_token"],
+        },
+        "scalr": {"type": "static", "fields": ["token", "hostname"]},
+        "jira": {"type": "static", "fields": ["email", "token", "cloud_id"]},
+        "google": {
+            "type": "oauth",
+            "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
+            "token_endpoint": "https://oauth2.googleapis.com/token",
+            "scopes": [
+                "https://www.googleapis.com/auth/gmail.readonly",
+                "https://www.googleapis.com/auth/calendar.readonly",
+                "https://www.googleapis.com/auth/drive.readonly",
+                "https://www.googleapis.com/auth/userinfo.email",
+            ],
+            "extra_params": {"access_type": "offline", "prompt": "consent"},
+        },
+    },
     "env": {
         "TERM": "$TERM",
         "COLORTERM": "$COLORTERM",
@@ -47,6 +84,22 @@ DEFAULT_CONFIG = {
         "GOOGLE_CLIENT_SECRET": "ak.google.client_secret",
     },
     "networks": [],
+    "notion": {
+        "read": {"enabled": True, "scope": {"pages": [], "databases": []}},
+        "write": {"enabled": False, "scope": {"pages": [], "databases": []}},
+    },
+    "google": {
+        "mail": {"enabled": True},
+        "calendar": {"enabled": True},
+        "drive": {"enabled": True},
+    },
+    "slack": {
+        "read": {
+            "enabled": True,
+            "scope": {"channels": [], "include_dms": False, "include_group_dms": False},
+        },
+        "write": {"enabled": True},
+    },
     "mounts": [
         ["~/.archie/persona/agents", "~/.kiro/agents"],
         ["~/.archie/persona/skills", "~/.kiro/skills"],
@@ -121,15 +174,23 @@ def install() -> None:
 
 
 def load_config() -> dict:
-    """Load config from ~/.archie/config.yaml."""
+    """Load config from ~/.archie/config.yaml, merged with defaults."""
+    if not CONFIG_PATH.exists():
+        return dict(DEFAULT_CONFIG)
     try:
         with CONFIG_PATH.open() as f:
-            return yaml.safe_load(f) or {}
+            raw = yaml.safe_load(f) or {}
     except yaml.YAMLError:
         from archie.output import print_error
 
         print_error(f"Invalid YAML in {CONFIG_PATH}")
         raise SystemExit(1) from None
+    if not isinstance(raw, dict):
+        from archie.output import print_error
+
+        print_error(f"Config must be a YAML mapping, got {type(raw).__name__}")
+        raise SystemExit(1)
+    return _deep_merge(DEFAULT_CONFIG, raw)
 
 
 def check_status() -> StatusCheck:
@@ -366,3 +427,9 @@ def _write_config(config: dict) -> None:
     InlineListDumper.add_representer(list, represent_list)
 
     CONFIG_PATH.write_text(yaml.dump(config, Dumper=InlineListDumper, sort_keys=False))
+
+
+def save_config(data: dict) -> None:
+    """Write config to YAML file (alias for _write_config)."""
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _write_config(data)

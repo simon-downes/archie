@@ -1,0 +1,375 @@
+"""Linear GraphQL API client."""
+
+from typing import Any
+
+import httpx
+
+API_URL = "https://api.linear.app/graphql"
+
+TEAMS_QUERY = """
+query { teams { nodes { id name key } } }
+"""
+
+TEAM_QUERY = """
+query Team($id: String!) {
+  team(id: $id) {
+    id name key
+    states { nodes { id name type position } }
+    labels { nodes { id name } }
+    members { nodes { id name email } }
+  }
+}
+"""
+
+PROJECTS_QUERY = """
+query Projects($filter: ProjectFilter) {
+  projects(filter: $filter) {
+    nodes { id name state }
+  }
+}
+"""
+
+ISSUES_QUERY = """
+query Issues($filter: IssueFilter, $first: Int, $after: String) {
+  issues(filter: $filter, first: $first, after: $after) {
+    nodes {
+      id identifier title priority
+      state { id name type }
+      assignee { id name }
+      labels { nodes { id name } }
+      project { id name }
+      createdAt updatedAt
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+}
+"""
+
+ISSUE_QUERY = """
+query Issue($id: String!) {
+  issue(id: $id) {
+    id identifier title description priority
+    state { id name type }
+    assignee { id name }
+    labels { nodes { id name } }
+    project { id name }
+    team { id name key }
+    createdAt updatedAt
+    comments { nodes { id body createdAt user { id name } } }
+  }
+}
+"""
+
+ISSUE_CREATE = """
+mutation IssueCreate($input: IssueCreateInput!) {
+  issueCreate(input: $input) {
+    success
+    issue { id identifier title state { name } assignee { name } priority }
+  }
+}
+"""
+
+ISSUE_UPDATE = """
+mutation IssueUpdate($id: String!, $input: IssueUpdateInput!) {
+  issueUpdate(id: $id, input: $input) {
+    success
+    issue { id identifier title state { name } assignee { name } priority }
+  }
+}
+"""
+
+COMMENT_CREATE = """
+mutation CommentCreate($input: CommentCreateInput!) {
+  commentCreate(input: $input) {
+    success
+    comment { id body createdAt user { name } }
+  }
+}
+"""
+
+COMMENTS_QUERY = """
+query IssueComments($id: String!) {
+  issue(id: $id) {
+    comments { nodes { id body createdAt user { id name } } }
+  }
+}
+"""
+
+FILE_UPLOAD = """
+mutation FileUpload($contentType: String!, $filename: String!, $size: Int!) {
+  fileUpload(contentType: $contentType, filename: $filename, size: $size) {
+    success
+    uploadFile { uploadUrl assetUrl headers { key value } }
+  }
+}
+"""
+
+
+class LinearClient:
+    """Client for Linear's GraphQL API."""
+
+    def __init__(self, api_key: str):
+        self._client = httpx.Client(
+            base_url=API_URL,
+            headers={"Authorization": api_key, "Content-Type": "application/json"},
+        )
+
+    # --- Public interface ---
+
+    def query(self, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Execute a GraphQL query and return the data dict."""
+        payload: dict[str, Any] = {"query": query}
+        if variables:
+            payload["variables"] = variables
+
+        resp = self._client.post("", json=payload)
+
+        if resp.status_code == 401:
+            resp.raise_for_status()
+
+        if resp.status_code == 429:
+            raise httpx.HTTPStatusError(
+                "Linear API rate limit exceeded, try again later",
+                request=resp.request,
+                response=resp,
+            )
+
+        body = resp.json()
+
+        if "errors" in body:
+            msgs = "; ".join(e.get("message", str(e)) for e in body["errors"])
+            raise ValueError(f"GraphQL error: {msgs}")
+
+        resp.raise_for_status()
+
+        return body.get("data", {})
+
+    def mutate(self, mutation: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Execute a GraphQL mutation. Same as query, just a semantic alias."""
+        return self.query(mutation, variables)
+
+    def get_teams(self) -> list[dict[str, Any]]:
+        data = self.query(TEAMS_QUERY)
+        return data["teams"]["nodes"]
+
+    def get_team(self, id_or_key: str) -> dict[str, Any]:
+        """Fetch team by ID or key. Tries ID first, falls back to key lookup."""
+        try:
+            data = self.query(TEAM_QUERY, {"id": id_or_key})
+            if data.get("team"):
+                return data["team"]
+        except ValueError:
+            pass
+
+        teams = self.get_teams()
+        for t in teams:
+            if t["key"].lower() == id_or_key.lower():
+                data = self.query(TEAM_QUERY, {"id": t["id"]})
+                return data["team"]
+
+        raise ValueError(f"team '{id_or_key}' not found")
+
+    def get_projects(self, *, team_key: str | None = None) -> list[dict[str, Any]]:
+        filt: dict[str, Any] | None = None
+        if team_key:
+            team = self.get_team(team_key)
+            filt = {"accessibleTeams": {"id": {"eq": team["id"]}}}
+        data = self.query(PROJECTS_QUERY, {"filter": filt})
+        return data["projects"]["nodes"]
+
+    def get_issues(
+        self,
+        *,
+        team_id: str,
+        status_id: str | None = None,
+        assignee_id: str | None = None,
+        label_id: str | None = None,
+        project_name: str | None = None,
+        created_after: str | None = None,
+        created_before: str | None = None,
+        updated_after: str | None = None,
+        updated_before: str | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """List issues with server-side filtering."""
+        filt: dict[str, Any] = {"team": {"id": {"eq": team_id}}}
+        if status_id:
+            filt["state"] = {"id": {"eq": status_id}}
+        if assignee_id:
+            filt["assignee"] = {"id": {"eq": assignee_id}}
+        if label_id:
+            filt["labels"] = {"id": {"eq": label_id}}
+        if project_name:
+            filt["project"] = {"name": {"eqIgnoreCase": project_name}}
+        if created_after or created_before:
+            created: dict[str, Any] = {}
+            if created_after:
+                created["gte"] = created_after
+            if created_before:
+                created["lte"] = created_before
+            filt["createdAt"] = created
+        if updated_after or updated_before:
+            updated: dict[str, Any] = {}
+            if updated_after:
+                updated["gte"] = updated_after
+            if updated_before:
+                updated["lte"] = updated_before
+            filt["updatedAt"] = updated
+
+        data = self.query(ISSUES_QUERY, {"filter": filt, "first": min(limit, 50)})
+        results = [self._format_issue(i) for i in data["issues"]["nodes"]]
+        while len(results) < limit and data["issues"]["pageInfo"]["hasNextPage"]:
+            cursor = data["issues"]["pageInfo"]["endCursor"]
+            page_size = min(limit - len(results), 50)
+            data = self.query(ISSUES_QUERY, {"filter": filt, "first": page_size, "after": cursor})
+            results.extend(self._format_issue(i) for i in data["issues"]["nodes"])
+        return results[:limit]
+
+    def get_issue(self, identifier: str) -> dict[str, Any]:
+        """Fetch a single issue by identifier (e.g. PLAT-123) or UUID."""
+        data = self.query(ISSUE_QUERY, {"id": identifier})
+        issue = data.get("issue")
+        if not issue:
+            raise ValueError(f"issue '{identifier}' not found")
+        return self._format_issue_detail(issue)
+
+    def create_issue(
+        self,
+        *,
+        team_id: str,
+        title: str,
+        description: str | None = None,
+        state_id: str | None = None,
+        assignee_id: str | None = None,
+        priority: int | None = None,
+        label_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Create an issue."""
+        inp: dict[str, Any] = {"teamId": team_id, "title": title}
+        if description:
+            inp["description"] = description
+        if state_id:
+            inp["stateId"] = state_id
+        if assignee_id:
+            inp["assigneeId"] = assignee_id
+        if priority is not None:
+            inp["priority"] = priority
+        if label_ids:
+            inp["labelIds"] = label_ids
+
+        data = self.mutate(ISSUE_CREATE, {"input": inp})
+        return self._format_issue(data["issueCreate"]["issue"])
+
+    def update_issue(
+        self,
+        identifier: str,
+        *,
+        title: str | None = None,
+        description: str | None = None,
+        state_id: str | None = None,
+        assignee_id: str | None = None,
+        priority: int | None = None,
+        label_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Update an issue."""
+        inp: dict[str, Any] = {}
+        if title:
+            inp["title"] = title
+        if description:
+            inp["description"] = description
+        if state_id:
+            inp["stateId"] = state_id
+        if assignee_id:
+            inp["assigneeId"] = assignee_id
+        if priority is not None:
+            inp["priority"] = priority
+        if label_ids is not None:
+            inp["labelIds"] = label_ids
+
+        data = self.mutate(ISSUE_UPDATE, {"id": identifier, "input": inp})
+        return self._format_issue(data["issueUpdate"]["issue"])
+
+    def get_comments(self, identifier: str) -> list[dict[str, Any]]:
+        """Fetch comments on an issue."""
+        data = self.query(COMMENTS_QUERY, {"id": identifier})
+        issue = data.get("issue")
+        if not issue:
+            raise ValueError(f"issue '{identifier}' not found")
+        return [
+            {
+                "author": c.get("user", {}).get("name"),
+                "body": c.get("body"),
+                "createdAt": c.get("createdAt"),
+            }
+            for c in issue.get("comments", {}).get("nodes", [])
+        ]
+
+    def create_comment(self, identifier: str, *, body: str) -> dict[str, Any]:
+        """Add a comment to an issue."""
+        data = self.mutate(COMMENT_CREATE, {"input": {"issueId": identifier, "body": body}})
+        c = data["commentCreate"]["comment"]
+        return {
+            "id": c["id"],
+            "author": c.get("user", {}).get("name"),
+            "body": c["body"],
+            "createdAt": c["createdAt"],
+        }
+
+    def upload_file(self, filepath: str) -> dict[str, Any]:
+        """Upload a file to Linear's storage. Returns asset URL."""
+        import mimetypes
+        from pathlib import Path
+
+        path = Path(filepath)
+        if not path.exists():
+            raise FileNotFoundError(f"file not found: {filepath}")
+
+        content_type = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
+        size = path.stat().st_size
+
+        data = self.mutate(
+            FILE_UPLOAD,
+            {"contentType": content_type, "filename": path.name, "size": size},
+        )
+        upload = data["fileUpload"]["uploadFile"]
+
+        headers = {"Content-Type": content_type, "Cache-Control": "public, max-age=31536000"}
+        for h in upload["headers"]:
+            headers[h["key"]] = h["value"]
+
+        resp = httpx.put(upload["uploadUrl"], content=path.read_bytes(), headers=headers)
+        resp.raise_for_status()
+
+        return {"assetUrl": upload["assetUrl"], "filename": path.name}
+
+    # --- Private implementation ---
+
+    def _format_issue(self, issue: dict[str, Any]) -> dict[str, Any]:
+        """Flatten an issue into a clean output dict."""
+        return {
+            "id": issue["id"],
+            "identifier": issue["identifier"],
+            "title": issue["title"],
+            "status": issue.get("state", {}).get("name"),
+            "assignee": (issue.get("assignee") or {}).get("name"),
+            "priority": issue.get("priority"),
+            "labels": [lbl["name"] for lbl in issue.get("labels", {}).get("nodes", [])],
+            "project": (issue.get("project") or {}).get("name"),
+            "createdAt": issue.get("createdAt"),
+            "updatedAt": issue.get("updatedAt"),
+        }
+
+    def _format_issue_detail(self, issue: dict[str, Any]) -> dict[str, Any]:
+        """Flatten an issue with full detail."""
+        result = self._format_issue(issue)
+        result["description"] = issue.get("description")
+        result["team"] = issue.get("team", {}).get("key")
+        result["comments"] = [
+            {
+                "author": c.get("user", {}).get("name"),
+                "body": c.get("body"),
+                "createdAt": c.get("createdAt"),
+            }
+            for c in issue.get("comments", {}).get("nodes", [])
+        ]
+        return result

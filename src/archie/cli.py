@@ -594,3 +594,28 @@ def build(quick: bool) -> None:
 
     print_error("Dockerfile not found in package data or source tree")
     sys.exit(1)
+
+
+# --- Agent-facing subcommands (JSON output) ---
+
+from archie.auth.cli import auth  # noqa: E402
+from archie.brain.cli import brain  # noqa: E402
+from archie.digest.cli import digest  # noqa: E402
+from archie.google.cli import google  # noqa: E402
+from archie.init import init as init_cmd  # noqa: E402
+from archie.jira.cli import jira  # noqa: E402
+from archie.linear.cli import linear  # noqa: E402
+from archie.notion.cli import notion  # noqa: E402
+from archie.project import project  # noqa: E402
+from archie.slack.cli import slack  # noqa: E402
+
+main.add_command(auth)
+main.add_command(brain)
+main.add_command(digest)
+main.add_command(google)
+main.add_command(init_cmd, name="init")
+main.add_command(jira)
+main.add_command(linear)
+main.add_command(notion)
+main.add_command(project)
+main.add_command(slack)
