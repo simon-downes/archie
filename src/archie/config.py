@@ -12,7 +12,6 @@ import yaml
 ARCHIE_HOME = Path.home() / ".archie"
 CONFIG_PATH = ARCHIE_HOME / "config.yaml"
 CREDENTIALS_PATH = ARCHIE_HOME / "credentials.yaml"
-PERSONA_PATH = ARCHIE_HOME / "persona"
 
 # macOS stores kiro data in ~/Library/Application Support/kiro-cli
 # Linux stores it in ~/.local/share/kiro-cli (XDG default)
@@ -117,40 +116,41 @@ class StatusCheck:
 
 def is_installed() -> bool:
     """Check if archie has been installed."""
-    return PERSONA_PATH.exists() and CONFIG_PATH.exists()
+    return CONFIG_PATH.exists()
 
 
 def install() -> None:
-    """Extract bundled persona to ~/.archie/persona/ and create default config."""
-    ARCHIE_HOME.mkdir(parents=True, exist_ok=True)
-
-    # Remove existing persona and extract fresh copy
-    if PERSONA_PATH.exists():
-        shutil.rmtree(PERSONA_PATH)
-
-    # Try package data first (installed wheel), fall back to source tree (dev)
-    try:
-        with as_file(files("archie").joinpath("persona")) as src:
-            shutil.copytree(str(src), str(PERSONA_PATH))
-    except FileNotFoundError:
-        src = Path(__file__).resolve().parents[2] / "persona"
-        if not src.exists():
-            raise FileNotFoundError("Persona not found in package data or source tree") from None
-        shutil.copytree(str(src), str(PERSONA_PATH))
-
-    # Template persona files with user info
-    _template_persona()
-
-    # Create or merge config
-    if CONFIG_PATH.exists():
-        existing = load_config()
-        merged = _deep_merge(DEFAULT_CONFIG, existing)
-        _write_config(merged)
+    """Symlink persona dirs to ~/.kiro/ paths for local kiro-cli use."""
+    # Detect repo location: editable install uses source dir, otherwise package data
+    src_dir = Path(__file__).resolve().parents[2] / "persona"
+    if src_dir.exists():
+        persona_src = src_dir
     else:
-        _write_config(DEFAULT_CONFIG)
+        pkg = files("archie").joinpath("persona")
+        with as_file(pkg) as p:
+            persona_src = Path(p)
 
-    # Deploy seeds to brain (only if not present)
-    _deploy_seeds()
+    kiro_home = Path.home() / ".kiro"
+    kiro_home.mkdir(parents=True, exist_ok=True)
+
+    # Symlink mappings: persona subdir → kiro target name
+    links = {
+        "skills": "skills",
+        "agents": "agents",
+        "prompts": "prompts",
+        "guidance": "steering",
+    }
+    for src_name, dest_name in links.items():
+        src = persona_src / src_name
+        dest = kiro_home / dest_name
+        if dest.is_symlink() or dest.exists():
+            dest.unlink() if dest.is_symlink() else shutil.rmtree(dest)
+        dest.symlink_to(src)
+
+    # Create config if not present
+    ARCHIE_HOME.mkdir(parents=True, exist_ok=True)
+    if not CONFIG_PATH.exists():
+        _write_config(DEFAULT_CONFIG)
 
 
 def load_config() -> dict:
@@ -453,39 +453,6 @@ def _deep_merge(base: dict, override: dict) -> dict:
         else:
             result[key] = val
     return result
-
-
-def _deploy_seeds() -> None:
-    """Copy seed files to brain if they don't already exist."""
-    brain_dir = resolve_brain_dir()
-    if not brain_dir.exists():
-        return
-
-    seeds_dir = PERSONA_PATH / "seeds"
-    if not seeds_dir.exists():
-        return
-
-    agent_dir = brain_dir / "_archie"
-    agent_dir.mkdir(parents=True, exist_ok=True)
-
-    for seed in seeds_dir.iterdir():
-        if seed.is_file():
-            dest = agent_dir / seed.name
-            if not dest.exists():
-                shutil.copy2(seed, dest)
-
-
-def _template_persona() -> None:
-    """Replace placeholders in persona files with user info."""
-    import getpass
-
-    username = getpass.getuser().split(".")[0].capitalize()
-    agent_config = PERSONA_PATH / "agents" / "archie.json"
-
-    if agent_config.exists():
-        content = agent_config.read_text()
-        content = content.replace("{{USER}}", username)
-        agent_config.write_text(content)
 
 
 def _write_config(config: dict) -> None:

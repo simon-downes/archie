@@ -12,13 +12,42 @@ class TestInitCommand:
         self.runner = CliRunner()
 
     @patch("archie.init.subprocess.run")
-    @patch("archie.init.save_config")
+    @patch("archie.init.migrate_from_agent_kit")
     @patch("archie.init.load_config")
-    def test_creates_structure(self, mock_load, mock_save, mock_run, tmp_path):
+    @patch("archie.init.save_config")
+    @patch("archie.init.save_credentials")
+    @patch("archie.init.CONFIG_PATH")
+    @patch("archie.init.CREDENTIALS_PATH")
+    @patch("archie.init.ARCHIE_HOME")
+    def test_creates_brain_structure(
+        self,
+        mock_home,
+        mock_creds_path,
+        mock_config_path,
+        mock_save_creds,
+        mock_save_config,
+        mock_load,
+        mock_migrate,
+        mock_run,
+        tmp_path,
+    ):
+        mock_home.mkdir = MagicMock()
+        mock_config_path.exists.return_value = False
+        mock_creds_path.exists.return_value = False
         mock_load.return_value = {"brain_dir": str(tmp_path)}
         mock_run.return_value = MagicMock(returncode=0, stderr="")
 
-        result = self.runner.invoke(init, ["--user", "simon", "--agent", "archie"])
+        # Create a fake persona path for seed deployment
+        with patch("archie.init._persona_path") as mock_persona:
+            persona_dir = tmp_path / "persona"
+            (persona_dir / "seeds").mkdir(parents=True)
+            (persona_dir / "seeds" / "soul.md").write_text("# Soul")
+            (persona_dir / "guidance").mkdir(parents=True)
+            (persona_dir / "guidance" / "tools.md").write_text("# Tools")
+            mock_persona.return_value = persona_dir
+
+            result = self.runner.invoke(init)
+
         assert result.exit_code == 0
 
         # Directories created
@@ -34,59 +63,190 @@ class TestInitCommand:
         # Files created
         assert (tmp_path / "BRAIN.md").exists()
         assert (tmp_path / "simon" / "profile.md").exists()
-        assert (tmp_path / "_archie" / "memory.md").exists()
-        assert (tmp_path / "_archie" / "signals.yaml").exists()
+        assert (tmp_path / "_archie" / "soul.md").exists()
+        assert (tmp_path / "_archie" / "tools.md").exists()
 
     @patch("archie.init.subprocess.run")
-    @patch("archie.init.save_config")
+    @patch("archie.init.migrate_from_agent_kit")
     @patch("archie.init.load_config")
-    def test_templates_substituted(self, mock_load, mock_save, mock_run, tmp_path):
+    @patch("archie.init.save_config")
+    @patch("archie.init.save_credentials")
+    @patch("archie.init.CONFIG_PATH")
+    @patch("archie.init.CREDENTIALS_PATH")
+    @patch("archie.init.ARCHIE_HOME")
+    def test_hardcoded_simon(
+        self,
+        mock_home,
+        mock_creds_path,
+        mock_config_path,
+        mock_save_creds,
+        mock_save_config,
+        mock_load,
+        mock_migrate,
+        mock_run,
+        tmp_path,
+    ):
+        mock_home.mkdir = MagicMock()
+        mock_config_path.exists.return_value = False
+        mock_creds_path.exists.return_value = False
         mock_load.return_value = {"brain_dir": str(tmp_path)}
         mock_run.return_value = MagicMock(returncode=0, stderr="")
 
-        self.runner.invoke(init, ["--user", "bob", "--agent", "hal"])
+        with patch("archie.init._persona_path") as mock_persona:
+            persona_dir = tmp_path / "persona"
+            (persona_dir / "seeds").mkdir(parents=True)
+            (persona_dir / "seeds" / "soul.md").write_text("# Soul")
+            (persona_dir / "guidance").mkdir(parents=True)
+            (persona_dir / "guidance" / "tools.md").write_text("# Tools")
+            mock_persona.return_value = persona_dir
+
+            self.runner.invoke(init)
 
         brain_md = (tmp_path / "BRAIN.md").read_text()
-        assert "bob" in brain_md
-        assert "hal" in brain_md
+        assert "simon" in brain_md.lower() or "Simon" in brain_md
         assert "{{USER}}" not in brain_md
         assert "{{AGENT}}" not in brain_md
 
-        profile_md = (tmp_path / "bob" / "profile.md").read_text()
-        assert "bob" in profile_md
+        profile_md = (tmp_path / "simon" / "profile.md").read_text()
+        assert "Simon" in profile_md
 
     @patch("archie.init.subprocess.run")
-    @patch("archie.init.save_config")
+    @patch("archie.init.migrate_from_agent_kit")
     @patch("archie.init.load_config")
-    def test_persists_config(self, mock_load, mock_save, mock_run, tmp_path):
+    @patch("archie.init.save_config")
+    @patch("archie.init.save_credentials")
+    @patch("archie.init.CONFIG_PATH")
+    @patch("archie.init.CREDENTIALS_PATH")
+    @patch("archie.init.ARCHIE_HOME")
+    def test_idempotent_skips_existing(
+        self,
+        mock_home,
+        mock_creds_path,
+        mock_config_path,
+        mock_save_creds,
+        mock_save_config,
+        mock_load,
+        mock_migrate,
+        mock_run,
+        tmp_path,
+    ):
+        mock_home.mkdir = MagicMock()
+        mock_config_path.exists.return_value = True  # config already exists
+        mock_creds_path.exists.return_value = True  # creds already exist
         mock_load.return_value = {"brain_dir": str(tmp_path)}
         mock_run.return_value = MagicMock(returncode=0, stderr="")
 
-        self.runner.invoke(init, ["--user", "simon", "--agent", "archie"])
+        # Pre-create brain structure
+        (tmp_path / "_archie").mkdir()
+        (tmp_path / "_archie" / "soul.md").write_text("# Existing soul")
+        (tmp_path / "BRAIN.md").write_text("# Existing brain")
+        (tmp_path / "simon").mkdir()
+        (tmp_path / "simon" / "profile.md").write_text("# Existing profile")
+        (tmp_path / ".git").mkdir()
 
-        mock_save.assert_called_once()
-        saved = mock_save.call_args[0][0]
-        assert saved["user"] == "simon"
-        assert saved["agent"] == "archie"
+        with patch("archie.init._persona_path") as mock_persona:
+            persona_dir = tmp_path / "persona"
+            (persona_dir / "seeds").mkdir(parents=True)
+            (persona_dir / "seeds" / "soul.md").write_text("# New soul")
+            (persona_dir / "guidance").mkdir(parents=True)
+            (persona_dir / "guidance" / "tools.md").write_text("# New tools")
+            mock_persona.return_value = persona_dir
+
+            result = self.runner.invoke(init)
+
+        assert result.exit_code == 0
+        # Existing files should NOT be overwritten
+        assert (tmp_path / "_archie" / "soul.md").read_text() == "# Existing soul"
+        assert (tmp_path / "BRAIN.md").read_text() == "# Existing brain"
+        assert (tmp_path / "simon" / "profile.md").read_text() == "# Existing profile"
+        # save_config should NOT be called (config already exists)
+        mock_save_config.assert_not_called()
 
     @patch("archie.init.subprocess.run")
-    @patch("archie.init.save_config")
+    @patch("archie.init.migrate_from_agent_kit")
     @patch("archie.init.load_config")
-    def test_git_init_called(self, mock_load, mock_save, mock_run, tmp_path):
+    @patch("archie.init.save_config")
+    @patch("archie.init.save_credentials")
+    @patch("archie.init.CONFIG_PATH")
+    @patch("archie.init.CREDENTIALS_PATH")
+    @patch("archie.init.ARCHIE_HOME")
+    def test_git_init_called(
+        self,
+        mock_home,
+        mock_creds_path,
+        mock_config_path,
+        mock_save_creds,
+        mock_save_config,
+        mock_load,
+        mock_migrate,
+        mock_run,
+        tmp_path,
+    ):
+        mock_home.mkdir = MagicMock()
+        mock_config_path.exists.return_value = False
+        mock_creds_path.exists.return_value = False
         mock_load.return_value = {"brain_dir": str(tmp_path)}
         mock_run.return_value = MagicMock(returncode=0, stderr="")
 
-        self.runner.invoke(init, ["--user", "simon", "--agent", "archie"])
+        with patch("archie.init._persona_path") as mock_persona:
+            persona_dir = tmp_path / "persona"
+            (persona_dir / "seeds").mkdir(parents=True)
+            (persona_dir / "seeds" / "soul.md").write_text("# Soul")
+            (persona_dir / "guidance").mkdir(parents=True)
+            (persona_dir / "guidance" / "tools.md").write_text("# Tools")
+            mock_persona.return_value = persona_dir
+
+            self.runner.invoke(init)
 
         mock_run.assert_called_once()
         assert mock_run.call_args[0][0] == ["git", "init"]
         assert mock_run.call_args[1]["cwd"] == tmp_path
 
+    @patch("archie.init.subprocess.run")
+    @patch("archie.init.migrate_from_agent_kit")
     @patch("archie.init.load_config")
-    def test_refuses_non_empty_dir(self, mock_load, tmp_path):
-        mock_load.return_value = {"brain_dir": str(tmp_path)}
-        (tmp_path / "existing-file.md").write_text("content")
+    @patch("archie.init.save_config")
+    @patch("archie.init.save_credentials")
+    @patch("archie.init.CONFIG_PATH")
+    @patch("archie.init.CREDENTIALS_PATH")
+    @patch("archie.init.ARCHIE_HOME")
+    def test_creates_database(
+        self,
+        mock_home,
+        mock_creds_path,
+        mock_config_path,
+        mock_save_creds,
+        mock_save_config,
+        mock_load,
+        mock_migrate,
+        mock_run,
+        tmp_path,
+    ):
+        import sqlite3
 
-        result = self.runner.invoke(init, ["--user", "simon", "--agent", "archie"])
-        assert result.exit_code != 0
-        assert "not empty" in result.output
+        mock_home.mkdir = MagicMock()
+        mock_config_path.exists.return_value = False
+        mock_creds_path.exists.return_value = False
+        mock_load.return_value = {"brain_dir": str(tmp_path)}
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+
+        with patch("archie.init._persona_path") as mock_persona:
+            persona_dir = tmp_path / "persona"
+            (persona_dir / "seeds").mkdir(parents=True)
+            (persona_dir / "seeds" / "soul.md").write_text("# Soul")
+            (persona_dir / "guidance").mkdir(parents=True)
+            (persona_dir / "guidance" / "tools.md").write_text("# Tools")
+            mock_persona.return_value = persona_dir
+
+            self.runner.invoke(init)
+
+        db_path = tmp_path / "brain.db"
+        assert db_path.exists()
+
+        db = sqlite3.connect(db_path)
+        # Verify tables exist
+        tables = db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        table_names = [t[0] for t in tables]
+        assert "refs" in table_names
+        assert "provenance" in table_names
+        db.close()
