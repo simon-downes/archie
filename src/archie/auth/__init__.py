@@ -1,4 +1,4 @@
-"""Credential store — read/write ~/.agent-kit/credentials.yaml with 0600 permissions."""
+"""Credential store — read/write ~/.archie/credentials.yaml with 0600 permissions."""
 
 import os
 import stat
@@ -7,8 +7,8 @@ from pathlib import Path
 
 import yaml
 
-AGENT_KIT_HOME = Path.home() / ".agent-kit"
-CREDENTIALS_PATH = AGENT_KIT_HOME / "credentials.yaml"
+ARCHIE_HOME = Path.home() / ".archie"
+CREDENTIALS_PATH = ARCHIE_HOME / "credentials.yaml"
 
 
 def load_credentials() -> dict:
@@ -32,7 +32,7 @@ def load_credentials() -> dict:
 
 def save_credentials(data: dict) -> None:
     """Write credentials file with 0600 permissions."""
-    AGENT_KIT_HOME.mkdir(parents=True, exist_ok=True)
+    ARCHIE_HOME.mkdir(parents=True, exist_ok=True)
     if not CREDENTIALS_PATH.exists():
         fd = os.open(str(CREDENTIALS_PATH), os.O_CREAT | os.O_WRONLY, 0o600)
         os.close(fd)

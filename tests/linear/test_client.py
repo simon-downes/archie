@@ -81,7 +81,8 @@ class TestGetTeams:
     def test_returns_teams(self):
         respx.post(LINEAR_API).mock(
             return_value=Response(
-                200, json={"data": {"teams": {"nodes": [{"id": "t1", "name": "Plat", "key": "PLAT"}]}}}
+                200,
+                json={"data": {"teams": {"nodes": [{"id": "t1", "name": "Plat", "key": "PLAT"}]}}},
             )
         )
         client = LinearClient("key")
@@ -166,10 +167,13 @@ class TestGetIssues:
 class TestGetIssue:
     @respx.mock
     def test_returns_detail(self):
-        issue = {**SAMPLE_ISSUE, "description": "desc", "team": {"key": "PLAT"}, "comments": {"nodes": []}}
-        respx.post(LINEAR_API).mock(
-            return_value=Response(200, json={"data": {"issue": issue}})
-        )
+        issue = {
+            **SAMPLE_ISSUE,
+            "description": "desc",
+            "team": {"key": "PLAT"},
+            "comments": {"nodes": []},
+        }
+        respx.post(LINEAR_API).mock(return_value=Response(200, json={"data": {"issue": issue}}))
         client = LinearClient("key")
         result = client.get_issue("PLAT-1")
         assert result["description"] == "desc"
@@ -177,9 +181,7 @@ class TestGetIssue:
 
     @respx.mock
     def test_not_found(self):
-        respx.post(LINEAR_API).mock(
-            return_value=Response(200, json={"data": {"issue": None}})
-        )
+        respx.post(LINEAR_API).mock(return_value=Response(200, json={"data": {"issue": None}}))
         client = LinearClient("key")
         with pytest.raises(ValueError, match="not found"):
             client.get_issue("PLAT-999")
@@ -209,7 +211,12 @@ class TestGetComments:
                         "issue": {
                             "comments": {
                                 "nodes": [
-                                    {"id": "c1", "body": "looks good", "createdAt": "2026-01-01", "user": {"id": "u1", "name": "Alice"}}
+                                    {
+                                        "id": "c1",
+                                        "body": "looks good",
+                                        "createdAt": "2026-01-01",
+                                        "user": {"id": "u1", "name": "Alice"},
+                                    }
                                 ]
                             }
                         }

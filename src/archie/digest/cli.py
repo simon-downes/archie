@@ -18,7 +18,7 @@ def _get_client(output_dir: str | None = None) -> DigestClient:
     if output_dir:
         out = Path(output_dir)
     else:
-        brain_dir = Path(config.get("brain", {}).get("dir", "~/.archie/brain")).expanduser()
+        brain_dir = Path(config.get("brain_dir", "~/.archie/brain")).expanduser()
         agent = config.get("agent", "archie")
         out = brain_dir / f"_{agent}" / "logs"
     return DigestClient(sessions_dir, out, sqlite_path=sqlite_path)

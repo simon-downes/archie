@@ -88,9 +88,7 @@ class TestRefreshToken:
         respx.post("https://auth.example.com/token").mock(
             return_value=Response(200, json={"access_token": "new_at", "refresh_token": "new_rt"})
         )
-        result = refresh_token(
-            "https://auth.example.com/token", client_id="cid", refresh="old_rt"
-        )
+        result = refresh_token("https://auth.example.com/token", client_id="cid", refresh="old_rt")
         assert result["access_token"] == "new_at"
 
     @respx.mock

@@ -87,7 +87,7 @@ def _write_session(tmp_path: Path, meta: dict, entries: list[dict]) -> tuple[Pat
     return sessions_dir, tmp_path / "output"
 
 
-MOCK_CONFIG = {"project_dir": "/home/user/dev", "brain": {"dir": "/tmp/brain"}, "agent": "archie"}
+MOCK_CONFIG = {"project_dir": "/home/user/dev", "brain_dir": "/tmp/brain", "agent": "archie"}
 
 PATCH_CONFIG = "archie.digest.client.load_config"
 

@@ -68,9 +68,7 @@ class TestAdfToText:
         doc = {
             "type": "doc",
             "version": 1,
-            "content": [
-                {"type": "paragraph", "content": [{"type": "text", "text": "hello"}]}
-            ],
+            "content": [{"type": "paragraph", "content": [{"type": "text", "text": "hello"}]}],
         }
         assert adf_to_text(doc) == "hello"
 
@@ -115,9 +113,7 @@ class TestAdfToText:
         doc = {
             "type": "doc",
             "version": 1,
-            "content": [
-                {"type": "codeBlock", "content": [{"type": "text", "text": "x = 1"}]}
-            ],
+            "content": [{"type": "codeBlock", "content": [{"type": "text", "text": "x = 1"}]}],
         }
         assert "```\nx = 1\n```" in adf_to_text(doc)
 
@@ -242,7 +238,11 @@ class TestGetProjects:
         respx.get(f"{BASE_URL}/project/search").mock(
             return_value=Response(
                 200,
-                json={"values": [{"id": "1", "key": "PLAT", "name": "Platform", "projectTypeKey": "software"}]},
+                json={
+                    "values": [
+                        {"id": "1", "key": "PLAT", "name": "Platform", "projectTypeKey": "software"}
+                    ]
+                },
             )
         )
         result = _client().get_projects()
@@ -296,9 +296,7 @@ class TestSearchIssues:
     @respx.mock
     def test_single_page(self):
         respx.post(f"{BASE_URL}/search/jql").mock(
-            return_value=Response(
-                200, json={"issues": [SAMPLE_ISSUE], "isLast": True}
-            )
+            return_value=Response(200, json={"issues": [SAMPLE_ISSUE], "isLast": True})
         )
         result = _client().search_issues(project="PLAT", limit=10)
         assert len(result) == 1
@@ -384,9 +382,7 @@ class TestGetIssue:
                 "comment": {"comments": []},
             },
         }
-        respx.get(f"{BASE_URL}/issue/PLAT-2").mock(
-            return_value=Response(200, json=issue)
-        )
+        respx.get(f"{BASE_URL}/issue/PLAT-2").mock(return_value=Response(200, json=issue))
         result = _client().get_issue("PLAT-2")
         assert result["status"] is None
         assert result["assignee"] is None
@@ -432,13 +428,9 @@ class TestTransitionIssue:
     @respx.mock
     def test_transitions(self):
         respx.get(f"{BASE_URL}/issue/PLAT-1/transitions").mock(
-            return_value=Response(
-                200, json={"transitions": [{"id": "t1", "name": "Done"}]}
-            )
+            return_value=Response(200, json={"transitions": [{"id": "t1", "name": "Done"}]})
         )
-        respx.post(f"{BASE_URL}/issue/PLAT-1/transitions").mock(
-            return_value=Response(204)
-        )
+        respx.post(f"{BASE_URL}/issue/PLAT-1/transitions").mock(return_value=Response(204))
         respx.get(f"{BASE_URL}/issue/PLAT-1").mock(
             return_value=Response(200, json=SAMPLE_ISSUE_DETAIL)
         )
@@ -557,9 +549,7 @@ class TestResolveAssignee:
 
     @respx.mock
     def test_not_found(self):
-        respx.get(f"{BASE_URL}/user/search").mock(
-            return_value=Response(200, json=[])
-        )
+        respx.get(f"{BASE_URL}/user/search").mock(return_value=Response(200, json=[]))
         with pytest.raises(ValueError, match="not found"):
             resolve_assignee(_client(), "nobody")
 
@@ -569,7 +559,13 @@ class TestResolveTransition:
     def test_case_insensitive(self):
         respx.get(f"{BASE_URL}/issue/PLAT-1/transitions").mock(
             return_value=Response(
-                200, json={"transitions": [{"id": "t1", "name": "Done"}, {"id": "t2", "name": "In Progress"}]}
+                200,
+                json={
+                    "transitions": [
+                        {"id": "t1", "name": "Done"},
+                        {"id": "t2", "name": "In Progress"},
+                    ]
+                },
             )
         )
         assert resolve_transition(_client(), "PLAT-1", "done") == "t1"
@@ -577,9 +573,7 @@ class TestResolveTransition:
     @respx.mock
     def test_not_found(self):
         respx.get(f"{BASE_URL}/issue/PLAT-1/transitions").mock(
-            return_value=Response(
-                200, json={"transitions": [{"id": "t1", "name": "Done"}]}
-            )
+            return_value=Response(200, json={"transitions": [{"id": "t1", "name": "Done"}]})
         )
         with pytest.raises(ValueError, match="Available"):
             resolve_transition(_client(), "PLAT-1", "nonexistent")

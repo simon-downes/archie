@@ -1,58 +1,72 @@
-"""Resolve credentials from config mappings for container injection."""
+"""Resolve credentials for container injection."""
 
 from datetime import UTC, datetime
-from pathlib import Path
 
 import yaml
 
-# Agent Kit credential store
-_AK_CREDENTIALS_PATH = Path.home() / ".agent-kit" / "credentials.yaml"
+from archie.config import CREDENTIALS_PATH
+
+# Hardcoded mapping: (service, field) → env var name
+CREDENTIAL_ENV_MAP = {
+    ("github", "token"): "GH_TOKEN",
+    ("notion", "access_token"): "NOTION_TOKEN",
+    ("linear", "token"): "LINEAR_TOKEN",
+    ("slack", "webhook_url"): "SLACK_WEBHOOK_URL",
+    ("slack", "client_id"): "SLACK_CLIENT_ID",
+    ("slack", "client_secret"): "SLACK_CLIENT_SECRET",
+    ("jira", "email"): "JIRA_EMAIL",
+    ("jira", "token"): "JIRA_TOKEN",
+    ("jira", "cloud_id"): "JIRA_CLOUD_ID",
+    ("google", "client_id"): "GOOGLE_CLIENT_ID",
+    ("google", "client_secret"): "GOOGLE_CLIENT_SECRET",
+    ("aws", "access_key_id"): "AWS_ACCESS_KEY_ID",
+    ("aws", "secret_access_key"): "AWS_SECRET_ACCESS_KEY",
+    ("aws", "session_token"): "AWS_SESSION_TOKEN",
+    ("scalr", "token"): "SCALR_TOKEN",
+    ("scalr", "hostname"): "SCALR_HOSTNAME",
+}
 
 
-def _load_ak_credentials() -> dict:
-    """Load agent-kit credentials file."""
-    if not _AK_CREDENTIALS_PATH.exists():
+def _load_credentials() -> dict:
+    """Load credentials from ~/.archie/credentials.yaml."""
+    if not CREDENTIALS_PATH.exists():
         return {}
     try:
-        with _AK_CREDENTIALS_PATH.open() as f:
+        with CREDENTIALS_PATH.open() as f:
             return yaml.safe_load(f) or {}
     except yaml.YAMLError:
         return {}
 
 
-def _resolve_ak(dotpath: str, creds: dict | None = None) -> str | None:
-    """Resolve an ak.service.field dotpath against agent-kit credentials."""
-    parts = dotpath.split(".", 2)
-    if len(parts) != 3 or parts[0] != "ak":
-        return None
-    service, field = parts[1], parts[2]
-    if creds is None:
-        creds = _load_ak_credentials()
-    service_data = creds.get(service)
-    if isinstance(service_data, dict):
-        value = service_data.get(field)
-        return str(value) if value is not None else None
-    return None
-
-
-def _try_refresh_ak(service: str) -> bool:
-    """Attempt to refresh expired OAuth tokens via agent-kit."""
+def _is_expired(service: str, creds: dict) -> bool:
+    """Check if a service's credentials have expired."""
+    expires_at = (creds.get(service) or {}).get("expires_at")
+    if not expires_at:
+        return False
     try:
-        ak_config_path = Path.home() / ".agent-kit" / "config.yaml"
-        if not ak_config_path.exists():
-            return False
-        with ak_config_path.open() as f:
-            ak_config = yaml.safe_load(f) or {}
-        auth_config = ak_config.get("auth", {}).get(service, {})
-        if auth_config.get("type") != "oauth":
-            return False
+        expiry = datetime.fromisoformat(str(expires_at))
+        return datetime.now(expiry.tzinfo) > expiry
+    except (ValueError, TypeError):
+        return False
 
+
+def _try_refresh(service: str) -> bool:
+    """Attempt to refresh expired OAuth tokens."""
+    try:
+        from archie.config import load_config
+
+        config = load_config()
+        auth_config = config.get("auth", {}).get(service, {})
         token_endpoint = auth_config.get("token_endpoint")
-        client_id = auth_config.get("client_id")
-        creds = _load_ak_credentials()
-        refresh = (creds.get(service) or {}).get("refresh_token")
+        if not token_endpoint:
+            return False
 
-        if not all([token_endpoint, client_id, refresh]):
+        creds = _load_credentials()
+        service_creds = creds.get(service) or {}
+        refresh_token = service_creds.get("refresh_token")
+        client_id = service_creds.get("client_id") or auth_config.get("client_id")
+
+        if not all([token_endpoint, client_id, refresh_token]):
             return False
 
         import httpx
@@ -61,7 +75,7 @@ def _try_refresh_ak(service: str) -> bool:
             token_endpoint,
             data={
                 "grant_type": "refresh_token",
-                "refresh_token": refresh,
+                "refresh_token": refresh_token,
                 "client_id": client_id,
             },
             headers={"Content-Type": "application/x-www-form-urlencoded"},
@@ -82,63 +96,40 @@ def _try_refresh_ak(service: str) -> bool:
         import os
         import stat
 
-        _AK_CREDENTIALS_PATH.write_text(yaml.dump(creds, default_flow_style=False, sort_keys=False))
-        os.chmod(str(_AK_CREDENTIALS_PATH), stat.S_IRUSR | stat.S_IWUSR)
+        CREDENTIALS_PATH.write_text(yaml.dump(creds, default_flow_style=False, sort_keys=False))
+        os.chmod(str(CREDENTIALS_PATH), stat.S_IRUSR | stat.S_IWUSR)
         return True
     except Exception:
         return False
 
 
-def _is_expired_ak(service: str, creds: dict | None = None) -> bool:
-    """Check if an agent-kit service's credentials have expired."""
-    if creds is None:
-        creds = _load_ak_credentials()
-    expires_at = (creds.get(service) or {}).get("expires_at")
-    if not expires_at:
-        return False
-    try:
-        expiry = datetime.fromisoformat(str(expires_at))
-        return datetime.now(expiry.tzinfo) > expiry
-    except (ValueError, TypeError):
-        return False
-
-
 def resolve_credentials(config: dict) -> dict[str, str]:
-    """Resolve credential mappings to env var name → value pairs.
+    """Resolve credentials to env var name → value pairs.
 
-    Supports ak.service.field dotpaths for agent-kit credentials.
-    Checks expiry for OAuth credentials and auto-refreshes if needed.
-    Missing credentials are silently skipped.
+    Reads ~/.archie/credentials.yaml and maps via CREDENTIAL_ENV_MAP.
+    Auto-refreshes expired OAuth tokens.
     """
     services_refreshed: set[str] = set()
     env = {}
-    creds = _load_ak_credentials()
+    creds = _load_credentials()
 
-    for env_name, dotpath in config.get("credentials", {}).items():
-        if not isinstance(dotpath, str) or not dotpath.startswith("ak."):
-            continue
-
-        parts = dotpath.split(".", 2)
-        if len(parts) != 3:
-            continue
-        service = parts[1]
-
+    for (service, field), env_name in CREDENTIAL_ENV_MAP.items():
         # Auto-refresh expired OAuth tokens (once per service)
         if service not in services_refreshed:
             services_refreshed.add(service)
-            if _is_expired_ak(service, creds):
-                if _try_refresh_ak(service):
+            if _is_expired(service, creds):
+                if _try_refresh(service):
                     from archie.output import print_info
 
                     print_info(f"Refreshed expired tokens for {service}")
-                    creds = _load_ak_credentials()  # reload after refresh
+                    creds = _load_credentials()
                 else:
                     from archie.output import print_error
 
                     print_error(f"Failed to refresh expired tokens for {service}")
 
-        value = _resolve_ak(dotpath, creds)
+        value = (creds.get(service) or {}).get(field)
         if value is not None:
-            env[env_name] = value
+            env[env_name] = str(value)
 
     return env

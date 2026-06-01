@@ -40,7 +40,7 @@ class TestSaveCredentials:
         creds_file = tmp_path / "creds.yaml"
         with (
             patch("archie.auth.CREDENTIALS_PATH", creds_file),
-            patch("archie.auth.AGENT_KIT_HOME", tmp_path),
+            patch("archie.auth.ARCHIE_HOME", tmp_path),
         ):
             save_credentials({"slack": {"token": "abc"}})
         assert creds_file.exists()
@@ -79,7 +79,7 @@ class TestSetField:
         creds_file.chmod(0o600)
         with (
             patch("archie.auth.CREDENTIALS_PATH", creds_file),
-            patch("archie.auth.AGENT_KIT_HOME", tmp_path),
+            patch("archie.auth.ARCHIE_HOME", tmp_path),
         ):
             set_field("slack", "token", "abc")
         loaded = yaml.safe_load(creds_file.read_text())
@@ -91,7 +91,7 @@ class TestSetField:
         creds_file.chmod(0o600)
         with (
             patch("archie.auth.CREDENTIALS_PATH", creds_file),
-            patch("archie.auth.AGENT_KIT_HOME", tmp_path),
+            patch("archie.auth.ARCHIE_HOME", tmp_path),
         ):
             set_field("slack", "new", "val")
         loaded = yaml.safe_load(creds_file.read_text())
@@ -106,7 +106,7 @@ class TestSetFields:
         creds_file.chmod(0o600)
         with (
             patch("archie.auth.CREDENTIALS_PATH", creds_file),
-            patch("archie.auth.AGENT_KIT_HOME", tmp_path),
+            patch("archie.auth.ARCHIE_HOME", tmp_path),
         ):
             set_fields("jira", {"email": "a@b.com", "token": "xyz"})
         loaded = yaml.safe_load(creds_file.read_text())

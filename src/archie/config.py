@@ -11,6 +11,7 @@ import yaml
 
 ARCHIE_HOME = Path.home() / ".archie"
 CONFIG_PATH = ARCHIE_HOME / "config.yaml"
+CREDENTIALS_PATH = ARCHIE_HOME / "credentials.yaml"
 PERSONA_PATH = ARCHIE_HOME / "persona"
 
 # macOS stores kiro data in ~/Library/Application Support/kiro-cli
@@ -23,12 +24,15 @@ _KIRO_DATA_DIR = (
 
 DEFAULT_CONFIG = {
     "project_dir": "~/dev",
+    "archie_repo": "~/dev/archie",
+    "brain_dir": "~/.archie/brain",
     "theme": "blue",
     "auth": {
-        "notion": {"type": "oauth"},
-        "linear": {"type": "static", "fields": ["token"]},
+        "notion": {
+            "authorization_endpoint": "https://api.notion.com/v1/oauth/authorize",
+            "token_endpoint": "https://api.notion.com/v1/oauth/token",
+        },
         "slack": {
-            "type": "oauth",
             "authorization_endpoint": "https://slack.com/oauth/v2/authorize",
             "token_endpoint": "https://slack.com/api/oauth.v2.access",
             "token_path": "authed_user.access_token",
@@ -40,15 +44,7 @@ DEFAULT_CONFIG = {
                 ),
             },
         },
-        "github": {"type": "static", "fields": ["token"]},
-        "aws": {
-            "type": "static",
-            "fields": ["access_key_id", "secret_access_key", "session_token"],
-        },
-        "scalr": {"type": "static", "fields": ["token", "hostname"]},
-        "jira": {"type": "static", "fields": ["email", "token", "cloud_id"]},
         "google": {
-            "type": "oauth",
             "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
             "token_endpoint": "https://oauth2.googleapis.com/token",
             "scopes": [
@@ -65,24 +61,7 @@ DEFAULT_CONFIG = {
         "COLORTERM": "$COLORTERM",
         "EDITOR": "$EDITOR",
     },
-    "credentials": {
-        "GH_TOKEN": "ak.github.token",
-        "NOTION_TOKEN": "ak.notion.access_token",
-        "AWS_ACCESS_KEY_ID": "ak.aws.access_key_id",
-        "AWS_SECRET_ACCESS_KEY": "ak.aws.secret_access_key",
-        "AWS_SESSION_TOKEN": "ak.aws.session_token",
-        "SCALR_TOKEN": "ak.scalr.token",
-        "SCALR_HOSTNAME": "ak.scalr.hostname",
-        "LINEAR_TOKEN": "ak.linear.token",
-        "SLACK_WEBHOOK_URL": "ak.slack.webhook_url",
-        "SLACK_CLIENT_ID": "ak.slack.client_id",
-        "SLACK_CLIENT_SECRET": "ak.slack.client_secret",
-        "JIRA_EMAIL": "ak.jira.email",
-        "JIRA_TOKEN": "ak.jira.token",
-        "JIRA_CLOUD_ID": "ak.jira.cloud_id",
-        "GOOGLE_CLIENT_ID": "ak.google.client_id",
-        "GOOGLE_CLIENT_SECRET": "ak.google.client_secret",
-    },
+    "credentials": {},
     "networks": [],
     "notion": {
         "read": {"enabled": True, "scope": {"pages": [], "databases": []}},
@@ -100,13 +79,14 @@ DEFAULT_CONFIG = {
         },
         "write": {"enabled": True},
     },
+    "projects": {},
+    "prompt": {
+        "scripts": {
+            "signals": "python3 ~/.kiro/prompts/build-signals.py",
+        },
+    },
     "mounts": [
-        ["~/.archie/persona/agents", "~/.kiro/agents"],
-        ["~/.archie/persona/skills", "~/.kiro/skills"],
-        ["~/.archie/persona/prompts", "~/.kiro/prompts"],
-        ["~/.archie/persona/guidance", "~/.kiro/steering"],
         ["~/.kiro/sessions", "~/.kiro/sessions"],
-        ["~/.agent-kit", "~/.agent-kit"],
         [_KIRO_DATA_DIR, "~/.local/share/kiro-cli"],
         "~/.toad",
         ["~/.archie/aws.config", "~/.aws/config:ro"],
@@ -193,6 +173,29 @@ def load_config() -> dict:
     return _deep_merge(DEFAULT_CONFIG, raw)
 
 
+def load_credentials() -> dict:
+    """Load credentials from ~/.archie/credentials.yaml."""
+    if not CREDENTIALS_PATH.exists():
+        return {}
+    try:
+        with CREDENTIALS_PATH.open() as f:
+            return yaml.safe_load(f) or {}
+    except yaml.YAMLError:
+        return {}
+
+
+def save_credentials(data: dict) -> None:
+    """Write credentials to ~/.archie/credentials.yaml with 0600 permissions."""
+    import os
+
+    ARCHIE_HOME.mkdir(parents=True, exist_ok=True)
+    if not CREDENTIALS_PATH.exists():
+        fd = os.open(str(CREDENTIALS_PATH), os.O_CREAT | os.O_WRONLY, 0o600)
+        os.close(fd)
+    CREDENTIALS_PATH.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
+    os.chmod(str(CREDENTIALS_PATH), 0o600)
+
+
 def check_status() -> StatusCheck:
     """Check environment readiness."""
     status = StatusCheck()
@@ -211,10 +214,7 @@ def check_status() -> StatusCheck:
         status.docker_running = result.returncode == 0
 
     # Project dir exists?
-    from archie.docker import _read_ak_config
-
-    ak_config = _read_ak_config()
-    project_dir = Path(ak_config.get("project_dir", "~/dev")).expanduser().resolve()
+    project_dir = Path(config.get("project_dir", "~/dev")).expanduser().resolve()
     status.project_dir = str(project_dir)
     status.project_dir_exists = project_dir.exists()
 
@@ -241,10 +241,8 @@ def check_status() -> StatusCheck:
     # Credential issues?
     from datetime import datetime
 
-    from archie.auth.inject import _load_ak_credentials
-
-    ak_creds = _load_ak_credentials()
-    for service, fields in ak_creds.items():
+    creds = load_credentials()
+    for service, fields in creds.items():
         if isinstance(fields, dict) and "expires_at" in fields:
             try:
                 expiry = datetime.fromisoformat(str(fields["expires_at"]))
@@ -343,14 +341,11 @@ def resolve_project() -> Path | None:
 
     The project is the first subdirectory under project_dir that is an
     ancestor of (or equal to) the current working directory.
-    Reads project_dir from agent-kit config (~/.agent-kit/config.yaml).
 
     Returns None if cwd is not inside a project (at project_dir root or outside it).
     """
-    from archie.docker import _read_ak_config
-
-    ak_config = _read_ak_config()
-    project_dir = Path(ak_config.get("project_dir", "~/dev")).expanduser().resolve()
+    config = load_config()
+    project_dir = Path(config.get("project_dir", "~/dev")).expanduser().resolve()
     cwd = Path.cwd().resolve()
 
     try:
@@ -362,6 +357,91 @@ def resolve_project() -> Path | None:
         return None
 
     return project_dir / relative.parts[0]
+
+
+def resolve_brain_dir() -> Path:
+    """Read brain dir from config."""
+    config = load_config()
+    return Path(config.get("brain_dir", "~/.archie/brain")).expanduser()
+
+
+def migrate_from_agent_kit() -> None:
+    """Migrate config from ~/.agent-kit/ to ~/.archie/ if old paths exist.
+
+    Only runs if ~/.agent-kit/config.yaml exists and ~/.archie/config.yaml
+    doesn't have a brain_dir key (migration marker).
+    """
+    ak_home = Path.home() / ".agent-kit"
+    ak_config_path = ak_home / "config.yaml"
+    ak_creds_path = ak_home / "credentials.yaml"
+    ak_projects_path = ak_home / "projects.yaml"
+
+    if not ak_config_path.exists():
+        return
+
+    # Check if already migrated
+    if CONFIG_PATH.exists():
+        try:
+            with CONFIG_PATH.open() as f:
+                existing = yaml.safe_load(f) or {}
+            if "brain_dir" in existing:
+                return
+        except yaml.YAMLError:
+            pass
+
+    # Read old config
+    try:
+        with ak_config_path.open() as f:
+            ak_config = yaml.safe_load(f) or {}
+    except yaml.YAMLError:
+        return
+
+    # Build unified config
+    unified = {}
+    brain = ak_config.get("brain", {})
+    if isinstance(brain, dict) and brain.get("dir"):
+        unified["brain_dir"] = brain["dir"]
+    if ak_config.get("project_dir"):
+        unified["project_dir"] = ak_config["project_dir"]
+
+    # Migrate auth providers
+    if ak_config.get("auth"):
+        unified["auth"] = ak_config["auth"]
+
+    # Migrate service scopes
+    for svc in ("notion", "google", "slack"):
+        if ak_config.get(svc):
+            unified[svc] = ak_config[svc]
+
+    # Migrate projects
+    if ak_projects_path.exists():
+        try:
+            with ak_projects_path.open() as f:
+                projects = yaml.safe_load(f) or {}
+            if projects:
+                unified["projects"] = projects
+        except yaml.YAMLError:
+            pass
+
+    # Write unified config
+    ARCHIE_HOME.mkdir(parents=True, exist_ok=True)
+    if CONFIG_PATH.exists():
+        existing = load_config()
+        merged = _deep_merge(existing, unified)
+        _write_config(merged)
+    else:
+        merged = _deep_merge(DEFAULT_CONFIG, unified)
+        _write_config(merged)
+
+    # Migrate credentials
+    if ak_creds_path.exists() and not CREDENTIALS_PATH.exists():
+        try:
+            with ak_creds_path.open() as f:
+                creds = yaml.safe_load(f) or {}
+            if creds:
+                save_credentials(creds)
+        except yaml.YAMLError:
+            pass
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -377,8 +457,6 @@ def _deep_merge(base: dict, override: dict) -> dict:
 
 def _deploy_seeds() -> None:
     """Copy seed files to brain if they don't already exist."""
-    from archie.docker import _read_ak_config, resolve_brain_dir
-
     brain_dir = resolve_brain_dir()
     if not brain_dir.exists():
         return
@@ -387,10 +465,7 @@ def _deploy_seeds() -> None:
     if not seeds_dir.exists():
         return
 
-    ak_config = _read_ak_config()
-    agent_name = ak_config.get("agent", "archie")
-
-    agent_dir = brain_dir / f"_{agent_name}"
+    agent_dir = brain_dir / "_archie"
     agent_dir.mkdir(parents=True, exist_ok=True)
 
     for seed in seeds_dir.iterdir():

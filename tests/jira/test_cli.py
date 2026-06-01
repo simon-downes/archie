@@ -66,7 +66,16 @@ class TestProjectsCommand:
             respx.get(f"{BASE_URL}/project/search").mock(
                 return_value=Response(
                     200,
-                    json={"values": [{"id": "1", "key": "PLAT", "name": "Platform", "projectTypeKey": "software"}]},
+                    json={
+                        "values": [
+                            {
+                                "id": "1",
+                                "key": "PLAT",
+                                "name": "Platform",
+                                "projectTypeKey": "software",
+                            }
+                        ]
+                    },
                 )
             )
             result = cli_runner.invoke(jira, ["projects"])
@@ -110,9 +119,7 @@ class TestIssuesCommand:
     def test_lists_issues(self, cli_runner):
         with patch("archie.jira.cli._get_client", return_value=_fake_client()):
             respx.post(f"{BASE_URL}/search/jql").mock(
-                return_value=Response(
-                    200, json={"issues": [SAMPLE_ISSUE], "isLast": True}
-                )
+                return_value=Response(200, json={"issues": [SAMPLE_ISSUE], "isLast": True})
             )
             result = cli_runner.invoke(jira, ["issues", "--project", "PLAT"])
         assert result.exit_code == 0
@@ -168,9 +175,7 @@ class TestUpdateIssueCommand:
             respx.get(f"{BASE_URL}/issue/PLAT-1").mock(
                 return_value=Response(200, json=SAMPLE_ISSUE_DETAIL)
             )
-            result = cli_runner.invoke(
-                jira, ["update-issue", "PLAT-1", "--summary", "Updated"]
-            )
+            result = cli_runner.invoke(jira, ["update-issue", "PLAT-1", "--summary", "Updated"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["key"] == "PLAT-1"
@@ -181,13 +186,9 @@ class TestTransitionCommand:
     def test_transitions_issue(self, cli_runner):
         with patch("archie.jira.cli._get_client", return_value=_fake_client()):
             respx.get(f"{BASE_URL}/issue/PLAT-1/transitions").mock(
-                return_value=Response(
-                    200, json={"transitions": [{"id": "t1", "name": "Done"}]}
-                )
+                return_value=Response(200, json={"transitions": [{"id": "t1", "name": "Done"}]})
             )
-            respx.post(f"{BASE_URL}/issue/PLAT-1/transitions").mock(
-                return_value=Response(204)
-            )
+            respx.post(f"{BASE_URL}/issue/PLAT-1/transitions").mock(return_value=Response(204))
             respx.get(f"{BASE_URL}/issue/PLAT-1").mock(
                 return_value=Response(200, json=SAMPLE_ISSUE_DETAIL)
             )

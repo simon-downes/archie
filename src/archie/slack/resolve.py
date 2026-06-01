@@ -19,12 +19,12 @@ def _get_cache_dir() -> Path:
     """Get cache directory."""
     global _cache_dir
     if _cache_dir is None:
-        primary = Path("~/.agent-kit/cache").expanduser()
+        primary = Path("~/.archie/cache").expanduser()
         try:
             primary.mkdir(parents=True, exist_ok=True)
             _cache_dir = primary
         except OSError:
-            _cache_dir = Path("/tmp/agent-kit-cache")
+            _cache_dir = Path("/tmp/archie-cache")
             _cache_dir.mkdir(parents=True, exist_ok=True)
     return _cache_dir
 

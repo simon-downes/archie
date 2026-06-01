@@ -5,12 +5,9 @@ from fnmatch import fnmatch
 from pathlib import Path
 
 import click
-import yaml
 
 from archie.config import load_config
 from archie.errors import handle_errors, output
-
-PROJECTS_PATH = Path("~/.agent-kit/projects.yaml").expanduser()
 
 
 def _parse_remote(url: str) -> tuple[str, str]:
@@ -92,13 +89,9 @@ def resolve_project(config: dict) -> dict:
 
 
 def _load_projects_config() -> dict:
-    """Load ~/.agent-kit/projects.yaml, returning empty dict if missing."""
-    if not PROJECTS_PATH.exists():
-        return {}
-    try:
-        return yaml.safe_load(PROJECTS_PATH.read_text()) or {}
-    except Exception:
-        return {}
+    """Load projects config from unified config."""
+    config = load_config()
+    return config.get("projects", {})
 
 
 def _resolve_project_config(org: str | None, repo: str | None, config: dict) -> dict:

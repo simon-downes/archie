@@ -51,7 +51,10 @@ class TestExtractBody:
             "mimeType": "multipart/alternative",
             "parts": [
                 {"mimeType": "text/plain", "body": {"data": plain}},
-                {"mimeType": "text/html", "body": {"data": urlsafe_b64encode(b"<b>Hi</b>").decode()}},
+                {
+                    "mimeType": "text/html",
+                    "body": {"data": urlsafe_b64encode(b"<b>Hi</b>").decode()},
+                },
             ],
         }
         assert _extract_body(payload) == "Hello plain"
@@ -128,19 +131,22 @@ class TestSearchMessages:
             return_value=Response(200, json={"messages": [{"id": "m1"}]})
         )
         respx.get(f"{GMAIL_API}/messages/m1").mock(
-            return_value=Response(200, json={
-                "id": "m1",
-                "snippet": "body text",
-                "payload": {
-                    "headers": [
-                        {"name": "Subject", "value": "Test"},
-                        {"name": "From", "value": "a@co.com"},
-                        {"name": "To", "value": "b@co.com"},
-                        {"name": "Date", "value": "2026-01-01"},
-                    ],
-                    "body": {"data": plain},
+            return_value=Response(
+                200,
+                json={
+                    "id": "m1",
+                    "snippet": "body text",
+                    "payload": {
+                        "headers": [
+                            {"name": "Subject", "value": "Test"},
+                            {"name": "From", "value": "a@co.com"},
+                            {"name": "To", "value": "b@co.com"},
+                            {"name": "Date", "value": "2026-01-01"},
+                        ],
+                        "body": {"data": plain},
+                    },
                 },
-            })
+            )
         )
         result = search_messages(google_client, "test", limit=5)
         assert len(result) == 1

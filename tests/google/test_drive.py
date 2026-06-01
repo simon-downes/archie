@@ -53,11 +53,14 @@ class TestFetchFile:
     def test_downloads_binary(self, google_client, tmp_path):
         respx.get(f"{DRIVE_API}/files/f1").mock(
             side_effect=[
-                Response(200, json={
-                    "id": "f1",
-                    "name": "report.pdf",
-                    "mimeType": "application/pdf",
-                }),
+                Response(
+                    200,
+                    json={
+                        "id": "f1",
+                        "name": "report.pdf",
+                        "mimeType": "application/pdf",
+                    },
+                ),
                 Response(200, content=b"%PDF-content"),
             ]
         )
@@ -71,11 +74,14 @@ class TestFetchFile:
             mock_run.return_value.returncode = 0
             mock_run.return_value.stdout = b"# Title\n\nContent"
             respx.get(f"{DRIVE_API}/files/f2").mock(
-                return_value=Response(200, json={
-                    "id": "f2",
-                    "name": "My Document",
-                    "mimeType": "application/vnd.google-apps.document",
-                })
+                return_value=Response(
+                    200,
+                    json={
+                        "id": "f2",
+                        "name": "My Document",
+                        "mimeType": "application/vnd.google-apps.document",
+                    },
+                )
             )
             respx.get(f"{DRIVE_API}/files/f2/export").mock(
                 return_value=Response(200, content=b"<h1>Title</h1><p>Content</p>")
@@ -86,11 +92,14 @@ class TestFetchFile:
     @respx.mock
     def test_exports_spreadsheet_as_csv(self, google_client, tmp_path):
         respx.get(f"{DRIVE_API}/files/f3").mock(
-            return_value=Response(200, json={
-                "id": "f3",
-                "name": "Data Sheet",
-                "mimeType": "application/vnd.google-apps.spreadsheet",
-            })
+            return_value=Response(
+                200,
+                json={
+                    "id": "f3",
+                    "name": "Data Sheet",
+                    "mimeType": "application/vnd.google-apps.spreadsheet",
+                },
+            )
         )
         respx.get(f"{DRIVE_API}/files/f3/export").mock(
             return_value=Response(200, content=b"a,b,c\n1,2,3")
@@ -105,11 +114,14 @@ class TestFetchToStdout:
     def test_exports_google_doc(self, google_client):
         with patch("archie.google.mail.subprocess.run", side_effect=FileNotFoundError):
             respx.get(f"{DRIVE_API}/files/f1").mock(
-                return_value=Response(200, json={
-                    "id": "f1",
-                    "name": "Doc",
-                    "mimeType": "application/vnd.google-apps.document",
-                })
+                return_value=Response(
+                    200,
+                    json={
+                        "id": "f1",
+                        "name": "Doc",
+                        "mimeType": "application/vnd.google-apps.document",
+                    },
+                )
             )
             respx.get(f"{DRIVE_API}/files/f1/export").mock(
                 return_value=Response(200, content=b"<p>Hello</p>")
@@ -120,11 +132,14 @@ class TestFetchToStdout:
     @respx.mock
     def test_raises_for_binary(self, google_client):
         respx.get(f"{DRIVE_API}/files/f1").mock(
-            return_value=Response(200, json={
-                "id": "f1",
-                "name": "file.zip",
-                "mimeType": "application/zip",
-            })
+            return_value=Response(
+                200,
+                json={
+                    "id": "f1",
+                    "name": "file.zip",
+                    "mimeType": "application/zip",
+                },
+            )
         )
         with pytest.raises(ValueError, match="binary files cannot be output"):
             fetch_to_stdout(google_client, "f1")

@@ -95,7 +95,11 @@ class TestGetUsers:
         respx.get(f"{SLACK_API}/users.list").mock(
             return_value=Response(
                 200,
-                json={"ok": True, "members": SAMPLE_USERS, "response_metadata": {"next_cursor": ""}},
+                json={
+                    "ok": True,
+                    "members": SAMPLE_USERS,
+                    "response_metadata": {"next_cursor": ""},
+                },
             )
         )
         users = get_users(client)
@@ -108,7 +112,11 @@ class TestGetUsers:
         route = respx.get(f"{SLACK_API}/users.list").mock(
             return_value=Response(
                 200,
-                json={"ok": True, "members": SAMPLE_USERS, "response_metadata": {"next_cursor": ""}},
+                json={
+                    "ok": True,
+                    "members": SAMPLE_USERS,
+                    "response_metadata": {"next_cursor": ""},
+                },
             )
         )
         get_users(client)
@@ -120,7 +128,11 @@ class TestGetUsers:
         route = respx.get(f"{SLACK_API}/users.list").mock(
             return_value=Response(
                 200,
-                json={"ok": True, "members": SAMPLE_USERS, "response_metadata": {"next_cursor": ""}},
+                json={
+                    "ok": True,
+                    "members": SAMPLE_USERS,
+                    "response_metadata": {"next_cursor": ""},
+                },
             )
         )
         get_users(client)
@@ -134,7 +146,11 @@ class TestResolveUserName:
         respx.get(f"{SLACK_API}/users.list").mock(
             return_value=Response(
                 200,
-                json={"ok": True, "members": SAMPLE_USERS, "response_metadata": {"next_cursor": ""}},
+                json={
+                    "ok": True,
+                    "members": SAMPLE_USERS,
+                    "response_metadata": {"next_cursor": ""},
+                },
             )
         )
         assert resolve_user_name(client, "U1") == "Alice"
@@ -156,7 +172,11 @@ class TestSearchUsers:
         respx.get(f"{SLACK_API}/users.list").mock(
             return_value=Response(
                 200,
-                json={"ok": True, "members": SAMPLE_USERS, "response_metadata": {"next_cursor": ""}},
+                json={
+                    "ok": True,
+                    "members": SAMPLE_USERS,
+                    "response_metadata": {"next_cursor": ""},
+                },
             )
         )
         results = search_users(client, "ali")
@@ -263,7 +283,11 @@ class TestResolveChannel:
         respx.get(f"{SLACK_API}/users.list").mock(
             return_value=Response(
                 200,
-                json={"ok": True, "members": SAMPLE_USERS, "response_metadata": {"next_cursor": ""}},
+                json={
+                    "ok": True,
+                    "members": SAMPLE_USERS,
+                    "response_metadata": {"next_cursor": ""},
+                },
             )
         )
         respx.post(f"{SLACK_API}/conversations.open").mock(

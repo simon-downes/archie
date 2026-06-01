@@ -23,12 +23,14 @@ class TestGoogleClientInit:
     def test_refreshes_expired_token(self):
         past = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
         with patch.object(GoogleClient, "_do_refresh") as mock_refresh:
-            GoogleClient({
-                "access_token": "old-tok",
-                "expires_at": past,
-                "refresh_token": "rt",
-                "client_id": "cid",
-            })
+            GoogleClient(
+                {
+                    "access_token": "old-tok",
+                    "expires_at": past,
+                    "refresh_token": "rt",
+                    "client_id": "cid",
+                }
+            )
             mock_refresh.assert_called_once()
 
 
@@ -54,14 +56,20 @@ class TestIsExpired:
 
 class TestRequireService:
     def test_enabled_by_default(self):
-        with patch("archie.google.cli.load_config", return_value={
-            "google": {"mail": {"enabled": True}},
-        }):
+        with patch(
+            "archie.google.cli.load_config",
+            return_value={
+                "google": {"mail": {"enabled": True}},
+            },
+        ):
             require_service("mail")  # should not raise
 
     def test_raises_when_disabled(self):
-        with patch("archie.google.cli.load_config", return_value={
-            "google": {"mail": {"enabled": False}},
-        }):
+        with patch(
+            "archie.google.cli.load_config",
+            return_value={
+                "google": {"mail": {"enabled": False}},
+            },
+        ):
             with pytest.raises(ConfigError, match="Google mail is disabled"):
                 require_service("mail")

@@ -9,6 +9,8 @@ import sys
 import time
 from pathlib import Path
 
+from archie.config import load_config
+
 IMAGE_NAME = "archie-sandbox"
 CONTAINER_PREFIX = "archie-"
 
@@ -19,9 +21,6 @@ HOST_UID = _user_info.pw_uid
 
 ARCHIE_HOME = Path.home() / ".archie"
 SESSIONS_DIR = ARCHIE_HOME / "sessions"
-
-_AK_CONFIG_PATH = Path.home() / ".agent-kit" / "config.yaml"
-_DEFAULT_BRAIN_DIR = ARCHIE_HOME / "brain"
 
 
 # --- Low-level Docker helpers ---
@@ -45,31 +44,6 @@ def _docker(*args: str, capture: bool = False) -> subprocess.CompletedProcess:
 def docker_output(*args: str) -> str:
     """Run a docker command and return stripped stdout."""
     return _docker(*args, capture=True).stdout.strip()
-
-
-# --- Config helpers ---
-
-
-def _read_ak_config() -> dict:
-    """Read agent-kit config, returning empty dict if missing."""
-    if _AK_CONFIG_PATH.exists():
-        try:
-            import yaml
-
-            with _AK_CONFIG_PATH.open() as f:
-                return yaml.safe_load(f) or {}
-        except Exception:
-            pass
-    return {}
-
-
-def resolve_brain_dir() -> Path:
-    """Read brain dir from agent-kit config, fall back to default."""
-    brain = _read_ak_config().get("brain", {})
-    brain_dir = brain.get("dir") if isinstance(brain, dict) else None
-    if brain_dir:
-        return Path(brain_dir).expanduser()
-    return _DEFAULT_BRAIN_DIR
 
 
 # --- Session helpers ---
@@ -172,7 +146,7 @@ def resolve_session(name: str, project: Path | None) -> tuple[Path | None, str, 
     Splits qualified names (project/session) and validates the session name.
     Returns the extracted session_name separately so callers don't pass raw qualified names.
     """
-    project_dir_cfg = _read_ak_config().get("project_dir", "~/dev")
+    project_dir_cfg = load_config().get("project_dir", "~/dev")
     project_dir = Path(project_dir_cfg).expanduser().resolve()
 
     # Qualified name: "project/session"
@@ -434,7 +408,7 @@ def run_container(
         background: Run detached with stdin but no TTY.
     """
     from archie.auth.inject import resolve_credentials
-    from archie.config import load_config, resolve_env, resolve_mounts
+    from archie.config import resolve_env, resolve_mounts
 
     config = load_config()
     mounts = resolve_mounts(config)
@@ -472,7 +446,20 @@ def run_container(
         container_workspace = f"{container_home}/workspace"
         args.extend(["-v", f"{session_dir}:{container_workspace}", "-w", container_workspace])
 
+    # Mount archie repo at /opt/archie (read-write)
+    archie_repo = Path(config.get("archie_repo", "~/dev/archie")).expanduser()
+    if archie_repo.exists():
+        args.extend(["-v", f"{archie_repo}:/opt/archie"])
+
+    # Mount ~/.archie/ read-write
+    archie_home = Path.home() / ".archie"
+    if archie_home.exists():
+        container_archie_home = f"{container_home}/.archie"
+        args.extend(["-v", f"{archie_home}:{container_archie_home}"])
+
     # Mount brain (always read-write)
+    from archie.config import resolve_brain_dir
+
     brain_dir = resolve_brain_dir()
     if brain_dir and brain_dir.exists():
         container_brain = str(brain_dir).replace(host_home, container_home)

@@ -33,9 +33,7 @@ ANCESTOR_TEXT = (
 def _mock_session(text_response: str):
     """Create a mock ClientSession that returns text content from call_tool."""
     session = AsyncMock()
-    content_block = SimpleNamespace(
-        model_dump=lambda: {"type": "text", "text": text_response}
-    )
+    content_block = SimpleNamespace(model_dump=lambda: {"type": "text", "text": text_response})
     result = SimpleNamespace(content=[content_block])
     session.call_tool.return_value = result
     return session

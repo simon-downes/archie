@@ -15,7 +15,7 @@ class TestInitCommand:
     @patch("archie.init.save_config")
     @patch("archie.init.load_config")
     def test_creates_structure(self, mock_load, mock_save, mock_run, tmp_path):
-        mock_load.return_value = {"brain": {"dir": str(tmp_path)}}
+        mock_load.return_value = {"brain_dir": str(tmp_path)}
         mock_run.return_value = MagicMock(returncode=0, stderr="")
 
         result = self.runner.invoke(init, ["--user", "simon", "--agent", "archie"])
@@ -41,7 +41,7 @@ class TestInitCommand:
     @patch("archie.init.save_config")
     @patch("archie.init.load_config")
     def test_templates_substituted(self, mock_load, mock_save, mock_run, tmp_path):
-        mock_load.return_value = {"brain": {"dir": str(tmp_path)}}
+        mock_load.return_value = {"brain_dir": str(tmp_path)}
         mock_run.return_value = MagicMock(returncode=0, stderr="")
 
         self.runner.invoke(init, ["--user", "bob", "--agent", "hal"])
@@ -59,7 +59,7 @@ class TestInitCommand:
     @patch("archie.init.save_config")
     @patch("archie.init.load_config")
     def test_persists_config(self, mock_load, mock_save, mock_run, tmp_path):
-        mock_load.return_value = {"brain": {"dir": str(tmp_path)}}
+        mock_load.return_value = {"brain_dir": str(tmp_path)}
         mock_run.return_value = MagicMock(returncode=0, stderr="")
 
         self.runner.invoke(init, ["--user", "simon", "--agent", "archie"])
@@ -73,7 +73,7 @@ class TestInitCommand:
     @patch("archie.init.save_config")
     @patch("archie.init.load_config")
     def test_git_init_called(self, mock_load, mock_save, mock_run, tmp_path):
-        mock_load.return_value = {"brain": {"dir": str(tmp_path)}}
+        mock_load.return_value = {"brain_dir": str(tmp_path)}
         mock_run.return_value = MagicMock(returncode=0, stderr="")
 
         self.runner.invoke(init, ["--user", "simon", "--agent", "archie"])
@@ -84,7 +84,7 @@ class TestInitCommand:
 
     @patch("archie.init.load_config")
     def test_refuses_non_empty_dir(self, mock_load, tmp_path):
-        mock_load.return_value = {"brain": {"dir": str(tmp_path)}}
+        mock_load.return_value = {"brain_dir": str(tmp_path)}
         (tmp_path / "existing-file.md").write_text("content")
 
         result = self.runner.invoke(init, ["--user", "simon", "--agent", "archie"])

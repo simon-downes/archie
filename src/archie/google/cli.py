@@ -29,7 +29,7 @@ def _resolve_raw_dir() -> str:
     from pathlib import Path
 
     config = load_config()
-    brain_dir = config.get("brain", {}).get("dir", "~/.archie/brain")
+    brain_dir = config.get("brain_dir", "~/.archie/brain")
     raw_dir = Path(brain_dir).expanduser() / "_raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
     return str(raw_dir)

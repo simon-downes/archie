@@ -107,9 +107,7 @@ class TestDmsCommand:
         respx.get(f"{SLACK_API}/conversations.list").mock(
             return_value=Response(200, json=DMS_RESPONSE)
         )
-        respx.get(f"{SLACK_API}/users.list").mock(
-            return_value=Response(200, json=USERS_RESPONSE)
-        )
+        respx.get(f"{SLACK_API}/users.list").mock(return_value=Response(200, json=USERS_RESPONSE))
         with _mock_client():
             result = cli_runner.invoke(slack, ["dms"])
         assert result.exit_code == 0
@@ -123,9 +121,7 @@ class TestDmsCommand:
         respx.get(f"{SLACK_API}/conversations.list").mock(
             return_value=Response(200, json=DMS_RESPONSE)
         )
-        respx.get(f"{SLACK_API}/users.list").mock(
-            return_value=Response(200, json=USERS_RESPONSE)
-        )
+        respx.get(f"{SLACK_API}/users.list").mock(return_value=Response(200, json=USERS_RESPONSE))
         with _mock_client():
             result = cli_runner.invoke(slack, ["dms", "--group"])
         data = json.loads(result.output)
@@ -139,9 +135,7 @@ class TestHistoryCommand:
         respx.get(f"{SLACK_API}/conversations.list").mock(
             return_value=Response(200, json=CHANNELS_RESPONSE)
         )
-        respx.get(f"{SLACK_API}/users.list").mock(
-            return_value=Response(200, json=USERS_RESPONSE)
-        )
+        respx.get(f"{SLACK_API}/users.list").mock(return_value=Response(200, json=USERS_RESPONSE))
         respx.get(f"{SLACK_API}/conversations.history").mock(
             return_value=Response(200, json=HISTORY_RESPONSE)
         )
@@ -160,9 +154,7 @@ class TestThreadCommand:
         respx.get(f"{SLACK_API}/conversations.list").mock(
             return_value=Response(200, json=CHANNELS_RESPONSE)
         )
-        respx.get(f"{SLACK_API}/users.list").mock(
-            return_value=Response(200, json=USERS_RESPONSE)
-        )
+        respx.get(f"{SLACK_API}/users.list").mock(return_value=Response(200, json=USERS_RESPONSE))
         respx.get(f"{SLACK_API}/conversations.replies").mock(
             return_value=Response(
                 200,
@@ -187,9 +179,7 @@ class TestSearchCommand:
         respx.get(f"{SLACK_API}/search.messages").mock(
             return_value=Response(200, json=SEARCH_RESPONSE)
         )
-        respx.get(f"{SLACK_API}/users.list").mock(
-            return_value=Response(200, json=USERS_RESPONSE)
-        )
+        respx.get(f"{SLACK_API}/users.list").mock(return_value=Response(200, json=USERS_RESPONSE))
         with _mock_client():
             result = cli_runner.invoke(slack, ["search", "deploy"])
         assert result.exit_code == 0
@@ -202,9 +192,7 @@ class TestUsersCommand:
     @respx.mock
     def test_lists_users(self, cli_runner, mock_config, cache_dir):
         mock_config()
-        respx.get(f"{SLACK_API}/users.list").mock(
-            return_value=Response(200, json=USERS_RESPONSE)
-        )
+        respx.get(f"{SLACK_API}/users.list").mock(return_value=Response(200, json=USERS_RESPONSE))
         with _mock_client():
             result = cli_runner.invoke(slack, ["users"])
         assert result.exit_code == 0
@@ -216,9 +204,7 @@ class TestUsersCommand:
 class TestSendCommand:
     @respx.mock
     def test_sends_webhook(self, cli_runner):
-        respx.post("https://hooks.slack.com/test").mock(
-            return_value=Response(200, text="ok")
-        )
+        respx.post("https://hooks.slack.com/test").mock(return_value=Response(200, text="ok"))
         with _mock_client():
             result = cli_runner.invoke(slack, ["send", "hello world"])
         assert result.exit_code == 0

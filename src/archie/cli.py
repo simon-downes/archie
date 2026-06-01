@@ -437,7 +437,7 @@ def status(as_json: bool) -> None:
     import json as json_mod
     from datetime import datetime
 
-    from archie.auth.inject import _load_ak_credentials
+    from archie.auth.inject import CREDENTIAL_ENV_MAP, _load_credentials
     from archie.config import CONFIG_PATH
 
     s = check_status()
@@ -446,18 +446,12 @@ def status(as_json: bool) -> None:
     img = image_info()
     containers = list_containers()
 
-    ak_creds = _load_ak_credentials()
+    creds = _load_credentials()
     creds_data = {}
-    for env_name, dotpath in config.get("credentials", {}).items():
-        if not isinstance(dotpath, str) or not dotpath.startswith("ak."):
-            continue
-        parts = dotpath.split(".", 2)
-        if len(parts) != 3:
-            continue
-        service, field = parts[1], parts[2]
-        value = (ak_creds.get(service) or {}).get(field)
+    for (service, field), env_name in CREDENTIAL_ENV_MAP.items():
+        value = (creds.get(service) or {}).get(field)
         configured = value is not None
-        expires_at = (ak_creds.get(service) or {}).get("expires_at") if configured else None
+        expires_at = (creds.get(service) or {}).get("expires_at") if configured else None
         key = f"{service}.{field}"
         creds_data[key] = {
             "env": env_name,
@@ -527,7 +521,7 @@ def status(as_json: bool) -> None:
         *[(m["exists"], m["path"], "missing" if not m["exists"] else "") for m in mounts_data]
     )
 
-    from archie.docker import resolve_brain_dir
+    from archie.config import resolve_brain_dir
 
     brain_dir = resolve_brain_dir()
     section("Brain")

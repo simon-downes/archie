@@ -1,4 +1,4 @@
-"""Shared error handling for agent-kit CLI commands."""
+"""Shared error handling for archie CLI commands."""
 
 import functools
 import json

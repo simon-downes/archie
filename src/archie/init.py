@@ -29,7 +29,7 @@ def _render(template: str, user: str, agent: str) -> str:
 def init(user: str, agent: str) -> None:
     """Initialise the brain and persist config."""
     config = load_config()
-    brain_dir = Path(config.get("brain", {}).get("dir", "~/.archie/brain")).expanduser()
+    brain_dir = Path(config.get("brain_dir", "~/.archie/brain")).expanduser()
 
     if brain_dir.exists() and any(brain_dir.iterdir()):
         raise ValueError(f"Brain directory already exists and is not empty: {brain_dir}")

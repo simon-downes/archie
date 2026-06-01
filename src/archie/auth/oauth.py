@@ -42,7 +42,7 @@ def register_client(registration_endpoint: str, redirect_uri: str) -> dict[str, 
     resp = httpx.post(
         registration_endpoint,
         json={
-            "client_name": "Agent Kit",
+            "client_name": "Archie",
             "redirect_uris": [redirect_uri],
             "grant_types": ["authorization_code", "refresh_token"],
             "response_types": ["code"],

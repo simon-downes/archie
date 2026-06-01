@@ -118,9 +118,7 @@ class TestDriveRecent:
     @respx.mock
     def test_recent(self, cli_runner):
         with patch("archie.google.cli.require_service"):
-            respx.get(f"{DRIVE_API}/files").mock(
-                return_value=Response(200, json={"files": []})
-            )
+            respx.get(f"{DRIVE_API}/files").mock(return_value=Response(200, json={"files": []}))
             result = cli_runner.invoke(google, ["drive", "recent"])
             assert result.exit_code == 0
 
@@ -129,8 +127,6 @@ class TestDriveList:
     @respx.mock
     def test_list(self, cli_runner):
         with patch("archie.google.cli.require_service"):
-            respx.get(f"{DRIVE_API}/files").mock(
-                return_value=Response(200, json={"files": []})
-            )
+            respx.get(f"{DRIVE_API}/files").mock(return_value=Response(200, json={"files": []}))
             result = cli_runner.invoke(google, ["drive", "list"])
             assert result.exit_code == 0

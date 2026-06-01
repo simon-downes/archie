@@ -19,7 +19,9 @@ TEAM_DATA = {
             "id": "t1",
             "name": "Platform",
             "key": "PLAT",
-            "states": {"nodes": [{"id": "s1", "name": "Todo", "type": "unstarted", "color": "#ccc"}]},
+            "states": {
+                "nodes": [{"id": "s1", "name": "Todo", "type": "unstarted", "color": "#ccc"}]
+            },
             "labels": {"nodes": [{"id": "l1", "name": "Bug"}]},
             "members": {"nodes": [{"id": "u1", "name": "Alice", "email": "a@co.com"}]},
         }
@@ -64,10 +66,11 @@ ISSUE_DETAIL_DATA = {
 def _fake_client():
     with patch(
         "archie.linear.cli._get_client",
-        return_value=__import__("archie.linear.client", fromlist=["LinearClient"]).LinearClient("fake"),
+        return_value=__import__("archie.linear.client", fromlist=["LinearClient"]).LinearClient(
+            "fake"
+        ),
     ):
         yield
-
 
 
 class TestTeamsCommand:
