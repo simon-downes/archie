@@ -27,13 +27,16 @@ def _load_template(name: str) -> str:
 
 
 def _persona_path() -> Path:
-    """Resolve persona directory — source tree for editable installs, package data otherwise."""
+    """Resolve persona directory from source tree.
+
+    In practice, archie is always run from an editable install (the repo is mounted
+    and installed with -e). This function finds the persona directory relative to the
+    source code location.
+    """
     src = Path(__file__).resolve().parents[2] / "persona"
     if src.exists():
         return src
-    pkg = files("archie").joinpath("persona")
-    with as_file(pkg) as p:
-        return Path(p)
+    raise FileNotFoundError("Persona directory not found — archie init requires an editable install")
 
 
 @click.command()

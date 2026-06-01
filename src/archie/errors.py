@@ -8,19 +8,19 @@ from typing import Any
 import httpx
 
 
-class AgentKitError(Exception):
+class ArchieError(Exception):
     """Base error. Exit code 1."""
 
 
-class AuthError(AgentKitError):
+class AuthError(ArchieError):
     """Authentication/credential errors. Exit code 2."""
 
 
-class ConfigError(AgentKitError):
+class ConfigError(ArchieError):
     """Configuration errors."""
 
 
-class ScopeError(AgentKitError):
+class ScopeError(ArchieError):
     """Resource outside configured access scope."""
 
 
@@ -34,7 +34,7 @@ def handle_errors(fn):
 
     Maps exception types to exit codes:
     - AuthError → exit 2
-    - AgentKitError (and subclasses) → exit 1
+    - ArchieError (and subclasses) → exit 1
     - httpx.HTTPStatusError 401/403 → exit 2
     - httpx.HTTPStatusError 429 → exit 1 with rate limit message
     - httpx.HTTPStatusError other → exit 1
@@ -52,7 +52,7 @@ def handle_errors(fn):
             _handle(cause)
         except (
             AuthError,
-            AgentKitError,
+            ArchieError,
             httpx.HTTPStatusError,
             ValueError,
             FileNotFoundError,
@@ -68,7 +68,7 @@ def _handle(e: BaseException) -> None:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(2)
 
-    if isinstance(e, AgentKitError):
+    if isinstance(e, ArchieError):
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 

@@ -91,7 +91,7 @@ src/archie/<service>/
 **Client classes:**
 - Accept credentials in `__init__` (token, API key, etc.)
 - Never read config, env vars, or call `sys.exit()`
-- Raise exceptions on failure (`AuthError`, `AgentKitError`, `httpx.HTTPStatusError`)
+- Raise exceptions on failure (`AuthError`, `ArchieError`, `httpx.HTTPStatusError`)
 - Return plain data (dicts, lists) — no formatting
 
 **CLI modules:**
@@ -102,7 +102,7 @@ src/archie/<service>/
 ### Error Handling
 
 ```python
-from archie.errors import AgentKitError, AuthError, handle_errors, output
+from archie.errors import ArchieError, AuthError, handle_errors, output
 
 @linear.command()
 @handle_errors
@@ -113,10 +113,10 @@ def issues() -> None:
 ```
 
 Exception hierarchy:
-- `AgentKitError` — base error (exit 1)
-- `AuthError(AgentKitError)` — credential problems (exit 2)
-- `ConfigError(AgentKitError)` — configuration problems (exit 1)
-- `ScopeError(AgentKitError)` — resource outside access scope (exit 1)
+- `ArchieError` — base error (exit 1)
+- `AuthError(ArchieError)` — credential problems (exit 2)
+- `ConfigError(ArchieError)` — configuration problems (exit 1)
+- `ScopeError(ArchieError)` — resource outside access scope (exit 1)
 
 The `@handle_errors` decorator catches these plus `httpx.HTTPStatusError` and exits
 cleanly with an error message to stderr.
@@ -126,7 +126,9 @@ cleanly with an error message to stderr.
 Credentials are stored at `~/.archie/credentials.yaml` (0600 permissions). At container
 launch, `inject.py` maps credentials to environment variables via a hardcoded
 `CREDENTIAL_ENV_MAP` and injects them as `-e` flags. Inside the container, client code
-reads from env vars.
+reads from the credential store first (`~/.archie/credentials.yaml` is mounted read-write),
+falling back to environment variables. The env var injection ensures credentials are
+available even if the credential store read fails.
 
 ### Container Workflow
 

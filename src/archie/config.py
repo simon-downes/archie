@@ -120,32 +120,44 @@ def is_installed() -> bool:
 
 
 def install() -> None:
-    """Symlink persona dirs to ~/.kiro/ paths for local kiro-cli use."""
-    # Detect repo location: editable install uses source dir, otherwise package data
+    """Deploy persona dirs to ~/.kiro/ paths for local kiro-cli use.
+
+    Editable installs: symlinks to source directory (changes are live).
+    Wheel installs: copies from package data (re-run to update).
+    """
+    # Detect repo location: editable install uses source dir
     src_dir = Path(__file__).resolve().parents[2] / "persona"
-    if src_dir.exists():
-        persona_src = src_dir
-    else:
-        pkg = files("archie").joinpath("persona")
-        with as_file(pkg) as p:
-            persona_src = Path(p)
+    editable = src_dir.exists()
 
     kiro_home = Path.home() / ".kiro"
     kiro_home.mkdir(parents=True, exist_ok=True)
 
-    # Symlink mappings: persona subdir → kiro target name
+    # Mapping: persona subdir → kiro target name
     links = {
         "skills": "skills",
         "agents": "agents",
         "prompts": "prompts",
         "guidance": "steering",
     }
-    for src_name, dest_name in links.items():
-        src = persona_src / src_name
-        dest = kiro_home / dest_name
-        if dest.is_symlink() or dest.exists():
-            dest.unlink() if dest.is_symlink() else shutil.rmtree(dest)
-        dest.symlink_to(src)
+
+    if editable:
+        # Symlink to source directory — changes are live
+        for src_name, dest_name in links.items():
+            src = src_dir / src_name
+            dest = kiro_home / dest_name
+            if dest.is_symlink() or dest.exists():
+                dest.unlink() if dest.is_symlink() else shutil.rmtree(dest)
+            dest.symlink_to(src)
+    else:
+        # Copy from package data — re-run install to update
+        pkg = files("archie").joinpath("persona")
+        with as_file(pkg) as persona_path:
+            for src_name, dest_name in links.items():
+                src = Path(persona_path) / src_name
+                dest = kiro_home / dest_name
+                if dest.is_symlink() or dest.exists():
+                    dest.unlink() if dest.is_symlink() else shutil.rmtree(dest)
+                shutil.copytree(str(src), str(dest))
 
     # Create config if not present
     ARCHIE_HOME.mkdir(parents=True, exist_ok=True)

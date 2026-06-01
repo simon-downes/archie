@@ -65,19 +65,24 @@ def _try_refresh(service: str) -> bool:
         service_creds = creds.get(service) or {}
         refresh_token = service_creds.get("refresh_token")
         client_id = service_creds.get("client_id") or auth_config.get("client_id")
+        client_secret = service_creds.get("client_secret") or auth_config.get("client_secret")
 
         if not all([token_endpoint, client_id, refresh_token]):
             return False
 
         import httpx
 
+        data = {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": client_id,
+        }
+        if client_secret:
+            data["client_secret"] = client_secret
+
         resp = httpx.post(
             token_endpoint,
-            data={
-                "grant_type": "refresh_token",
-                "refresh_token": refresh_token,
-                "client_id": client_id,
-            },
+            data=data,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
             timeout=30,
         )
@@ -103,7 +108,7 @@ def _try_refresh(service: str) -> bool:
         return False
 
 
-def resolve_credentials(config: dict) -> dict[str, str]:
+def resolve_credentials() -> dict[str, str]:
     """Resolve credentials to env var name → value pairs.
 
     Reads ~/.archie/credentials.yaml and maps via CREDENTIAL_ENV_MAP.

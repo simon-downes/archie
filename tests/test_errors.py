@@ -6,7 +6,7 @@ import httpx
 import pytest
 
 from archie.errors import (
-    AgentKitError,
+    ArchieError,
     AuthError,
     ConfigError,
     ScopeError,
@@ -69,7 +69,7 @@ class TestHandleErrors:
     def test_generic_archie_error_exits_1(self, capsys):
         @handle_errors
         def fn():
-            raise AgentKitError("generic")
+            raise ArchieError("generic")
 
         with pytest.raises(SystemExit) as exc_info:
             fn()

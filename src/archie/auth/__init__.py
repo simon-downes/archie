@@ -3,12 +3,10 @@
 import os
 import stat
 import sys
-from pathlib import Path
 
 import yaml
 
-ARCHIE_HOME = Path.home() / ".archie"
-CREDENTIALS_PATH = ARCHIE_HOME / "credentials.yaml"
+from archie.config import ARCHIE_HOME, CREDENTIALS_PATH
 
 
 def load_credentials() -> dict:

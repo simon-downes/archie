@@ -25,7 +25,7 @@ build-backend = "hatchling.build"
 packages = ["src/archie"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"sandbox/Dockerfile" = "archie/sandbox/Dockerfile"
+"sandbox" = "archie/sandbox"
 "persona" = "archie/persona"
 "src/archie/auth/providers.yaml" = "archie/auth/providers.yaml"
 "src/archie/brain/templates" = "archie/brain/templates"

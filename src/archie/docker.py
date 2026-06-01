@@ -9,7 +9,7 @@ import sys
 import time
 from pathlib import Path
 
-from archie.config import load_config
+from archie.config import ARCHIE_HOME, load_config
 
 IMAGE_NAME = "archie-sandbox"
 CONTAINER_PREFIX = "archie-"
@@ -19,7 +19,6 @@ _user_info = pwd.getpwuid(os.getuid())
 HOST_USERNAME = _user_info.pw_name
 HOST_UID = _user_info.pw_uid
 
-ARCHIE_HOME = Path.home() / ".archie"
 SESSIONS_DIR = ARCHIE_HOME / "sessions"
 
 
@@ -413,7 +412,7 @@ def run_container(
     config = load_config()
     mounts = resolve_mounts(config)
     env = resolve_env(config)
-    creds = resolve_credentials(config)
+    creds = resolve_credentials()
     networks = _resolve_networks(config)
 
     host_home = str(Path.home())
