@@ -40,8 +40,8 @@ class TestInitCommand:
         # Create a fake persona path for seed deployment
         with patch("archie.init._persona_path") as mock_persona:
             persona_dir = tmp_path / "persona"
-            (persona_dir / "seeds").mkdir(parents=True)
-            (persona_dir / "seeds" / "soul.md").write_text("# Soul")
+            (persona_dir / "agents").mkdir(parents=True)
+            (persona_dir / "agents" / "archie.md").write_text("# Soul")
             (persona_dir / "guidance").mkdir(parents=True)
             (persona_dir / "guidance" / "tools.md").write_text("# Tools")
             mock_persona.return_value = persona_dir
@@ -94,8 +94,8 @@ class TestInitCommand:
 
         with patch("archie.init._persona_path") as mock_persona:
             persona_dir = tmp_path / "persona"
-            (persona_dir / "seeds").mkdir(parents=True)
-            (persona_dir / "seeds" / "soul.md").write_text("# Soul")
+            (persona_dir / "agents").mkdir(parents=True)
+            (persona_dir / "agents" / "archie.md").write_text("# Soul")
             (persona_dir / "guidance").mkdir(parents=True)
             (persona_dir / "guidance" / "tools.md").write_text("# Tools")
             mock_persona.return_value = persona_dir
@@ -146,8 +146,8 @@ class TestInitCommand:
 
         with patch("archie.init._persona_path") as mock_persona:
             persona_dir = tmp_path / "persona"
-            (persona_dir / "seeds").mkdir(parents=True)
-            (persona_dir / "seeds" / "soul.md").write_text("# New soul")
+            (persona_dir / "agents").mkdir(parents=True)
+            (persona_dir / "agents" / "archie.md").write_text("# New soul")
             (persona_dir / "guidance").mkdir(parents=True)
             (persona_dir / "guidance" / "tools.md").write_text("# New tools")
             mock_persona.return_value = persona_dir
@@ -190,8 +190,8 @@ class TestInitCommand:
 
         with patch("archie.init._persona_path") as mock_persona:
             persona_dir = tmp_path / "persona"
-            (persona_dir / "seeds").mkdir(parents=True)
-            (persona_dir / "seeds" / "soul.md").write_text("# Soul")
+            (persona_dir / "agents").mkdir(parents=True)
+            (persona_dir / "agents" / "archie.md").write_text("# Soul")
             (persona_dir / "guidance").mkdir(parents=True)
             (persona_dir / "guidance" / "tools.md").write_text("# Tools")
             mock_persona.return_value = persona_dir
@@ -232,8 +232,8 @@ class TestInitCommand:
 
         with patch("archie.init._persona_path") as mock_persona:
             persona_dir = tmp_path / "persona"
-            (persona_dir / "seeds").mkdir(parents=True)
-            (persona_dir / "seeds" / "soul.md").write_text("# Soul")
+            (persona_dir / "agents").mkdir(parents=True)
+            (persona_dir / "agents" / "archie.md").write_text("# Soul")
             (persona_dir / "guidance").mkdir(parents=True)
             (persona_dir / "guidance" / "tools.md").write_text("# Tools")
             mock_persona.return_value = persona_dir

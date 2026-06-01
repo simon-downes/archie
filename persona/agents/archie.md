@@ -189,3 +189,11 @@ Message pattern → Mode → Response
 
 10. **Quality Over Speed**\
     Thorough investigation and correctness are more important than speed.
+
+---
+
+@agent brain.md
+@agent memory.md
+@script signals
+@agent tools.md
+@user profile.md

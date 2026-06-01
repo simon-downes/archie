@@ -78,11 +78,11 @@ def init() -> None:
             d.mkdir(parents=True, exist_ok=True)
             click.echo(f"  Created {d.relative_to(brain_dir)}/")
 
-    # Deploy soul.md from persona/seeds/soul.md (M5 will change source to persona/agents/archie.md)
+    # Deploy soul.md from persona/agents/archie.md
     soul_dest = brain_dir / "_archie" / "soul.md"
     if not soul_dest.exists():
         persona = _persona_path()
-        soul_src = persona / "seeds" / "soul.md"
+        soul_src = persona / "agents" / "archie.md"
         if soul_src.exists():
             soul_dest.write_text(soul_src.read_text())
             click.echo("  Deployed _archie/soul.md")
