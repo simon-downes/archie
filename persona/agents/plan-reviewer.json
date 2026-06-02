@@ -1,7 +1,7 @@
 {
   "name": "plan-reviewer",
   "description": "Reviews implementation plans for completeness, unresolved decisions, and implementability",
-  "prompt": "file://../prompts/plan-reviewer.prompt.md",
+  "prompt": "file://plan-reviewer.md",
   "tools": ["read", "glob", "grep", "shell", "code"],
   "allowedTools": ["read", "glob", "grep", "shell", "code"],
   "toolsSettings": {

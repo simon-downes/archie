@@ -1,7 +1,7 @@
 {
   "name": "qa-runner",
   "description": "Runs qa checks such as formatting, linting, and tests",
-  "prompt": "file://../prompts/qa-runner.prompt.md",
+  "prompt": "file://qa-runner.md",
   "tools": ["read", "glob", "grep", "shell"],
   "allowedTools": ["read", "glob", "grep", "shell"],
   "resources": [

@@ -9,8 +9,8 @@ uv tool install -e /opt/archie --quiet
 # Symlink persona dirs to kiro-cli paths
 ln -sfn /opt/archie/persona/skills ~/.kiro/skills
 ln -sfn /opt/archie/persona/agents ~/.kiro/agents
-ln -sfn /opt/archie/persona/prompts ~/.kiro/prompts
 ln -sfn /opt/archie/persona/guidance ~/.kiro/steering
+ln -sfn /opt/archie/persona/prompts ~/.kiro/prompts
 
 # Resolve paths from archie config
 archie_config="$HOME/.archie/config.yaml"
@@ -23,7 +23,10 @@ fi
 
 agent_dir="$brain_dir/_archie"
 user_dir="$brain_dir/simon"
-prompt_out="$HOME/.kiro/prompts/archie.prompt.md"
+prompt_out="$HOME/.kiro/archie/prompt.md"
+
+# Ensure output directory exists
+mkdir -p "$(dirname "$prompt_out")"
 
 # Assemble system prompt by resolving @ directives in soul.md
 if [ -f "$agent_dir/soul.md" ]; then

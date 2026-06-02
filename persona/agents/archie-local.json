@@ -1,7 +1,7 @@
 {
   "name": "archie-local",
   "description": "Host-native engineering agent with restricted write and shell access for local development",
-  "prompt": "file://../prompts/archie.prompt.md",
+  "prompt": "file://../archie/prompt.md",
   "model": "claude-opus-4.6",
   "mcpServers": {
     "aws-knowledge": {

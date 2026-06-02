@@ -1,7 +1,7 @@
 {
   "name": "archie",
   "description": "General-purpose engineering agent designed for sandbox execution with broad capabilities and minimal restrictions",
-  "prompt": "file://../prompts/archie.prompt.md",
+  "prompt": "file://../archie/prompt.md",
   "model": "claude-opus-4.6",
   "mcpServers": {
     "aws-knowledge": {
