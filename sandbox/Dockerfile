@@ -218,4 +218,3 @@ ENV PATH="/home/${USERNAME}/.local/bin:${PATH}" \
     LESSCHARSET=utf-8
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["/bin/bash"]

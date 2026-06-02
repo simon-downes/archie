@@ -193,18 +193,10 @@ def main(
             print_error("Cannot combine --bg and --shell")
             sys.exit(1)
 
-    # Inside sandbox: run kiro-cli directly (no Docker needed)
+    # Inside sandbox: run kiro directly
     if is_sandbox():
         prompt_args = (ctx.obj or {}).get("_prompt_args", [])
-        prompt = " ".join(prompt_args) if prompt_args else None
-        if not prompt and not sys.stdin.isatty():
-            prompt = sys.stdin.read().strip() or None
-        command = ["kiro-cli", "chat", "--agent", "archie"]
-        if prompt:
-            command.append(prompt)
-        import subprocess as sp
-
-        sys.exit(sp.run(command).returncode)
+        ctx.invoke(kiro, prompt=tuple(prompt_args) if prompt_args else ())
 
     if not is_installed():
         print_error(f"Archie is not installed. Run [{C_CMD}]archie install[/] first.")
@@ -239,17 +231,18 @@ def _run_session(
     project = resolve_project()
 
     # Build the command
+    entrypoint = None
     if use_shell:
+        entrypoint = "/bin/bash"
         if prompt:
-            command = ["/bin/bash", "-c", prompt]
+            command = ["-c", prompt]
         else:
-            command = ["/bin/bash"]
+            command = []
     else:
-        command = ["kiro-cli", "chat", "--agent", "archie"]
-        if background or not sys.stdout.isatty():
-            command.append("--no-interactive")
+        # Entrypoint runs archie kiro — pass prompt as args if provided
+        command = []
         if prompt:
-            command.append(prompt)
+            command = [prompt]
 
     # Named session
     if name:
@@ -290,20 +283,25 @@ def _run_session(
                 session_name=session_name,
                 session_dir=session_dir,
                 background=background,
+                entrypoint=entrypoint,
             )
         )
 
     # Unnamed session
     if project:
         # Unnamed project — mount project dir directly
-        sys.exit(run_container(command, project=project, background=background))
+        sys.exit(
+            run_container(command, project=project, background=background, entrypoint=entrypoint)
+        )
     else:
         # Unnamed general — transient working dir
         suffix = hash_suffix()
         session_dir = SESSIONS_DIR / "general" / suffix
         session_dir.mkdir(parents=True, exist_ok=True)
         try:
-            returncode = run_container(command, session_dir=session_dir, background=background)
+            returncode = run_container(
+                command, session_dir=session_dir, background=background, entrypoint=entrypoint
+            )
         finally:
             # Clean up transient dir
             if session_dir.exists():
@@ -680,6 +678,7 @@ from archie.digest.cli import digest  # noqa: E402
 from archie.google.cli import google  # noqa: E402
 from archie.init import init as init_cmd  # noqa: E402
 from archie.jira.cli import jira  # noqa: E402
+from archie.kiro import kiro  # noqa: E402
 from archie.linear.cli import linear  # noqa: E402
 from archie.notion.cli import notion  # noqa: E402
 from archie.project import project  # noqa: E402
@@ -691,6 +690,7 @@ main.add_command(digest)
 main.add_command(google)
 main.add_command(init_cmd, name="init")
 main.add_command(jira)
+main.add_command(kiro)
 main.add_command(linear)
 main.add_command(notion)
 main.add_command(project)

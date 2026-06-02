@@ -81,9 +81,7 @@ DEFAULT_CONFIG = {
     },
     "projects": {},
     "prompt": {
-        "scripts": {
-            "signals": "python3 ~/.kiro/prompts/build-signals.py",
-        },
+        "scripts": {},
     },
     "mounts": [
         ["~/.kiro/sessions", "~/.kiro/sessions"],
