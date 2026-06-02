@@ -231,18 +231,15 @@ def _run_session(
     project = resolve_project()
 
     # Build the command
-    entrypoint = None
     if use_shell:
-        entrypoint = "/bin/bash"
         if prompt:
-            command = ["-c", prompt]
+            command = ["/bin/bash", "-c", prompt]
         else:
-            command = []
+            command = ["/bin/bash"]
     else:
-        # Entrypoint runs archie kiro — pass prompt as args if provided
-        command = []
+        command = ["archie", "kiro"]
         if prompt:
-            command = [prompt]
+            command.append(prompt)
 
     # Named session
     if name:
@@ -283,7 +280,6 @@ def _run_session(
                 session_name=session_name,
                 session_dir=session_dir,
                 background=background,
-                entrypoint=entrypoint,
             )
         )
 
@@ -291,7 +287,7 @@ def _run_session(
     if project:
         # Unnamed project — mount project dir directly
         sys.exit(
-            run_container(command, project=project, background=background, entrypoint=entrypoint)
+            run_container(command, project=project, background=background)
         )
     else:
         # Unnamed general — transient working dir
@@ -300,7 +296,7 @@ def _run_session(
         session_dir.mkdir(parents=True, exist_ok=True)
         try:
             returncode = run_container(
-                command, session_dir=session_dir, background=background, entrypoint=entrypoint
+                command, session_dir=session_dir, background=background
             )
         finally:
             # Clean up transient dir

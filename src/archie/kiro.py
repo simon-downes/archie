@@ -18,7 +18,8 @@ PROMPT_OUT = KIRO_HOME / "archie" / "prompt.md"
 @click.argument("prompt", nargs=-1)
 def kiro(prompt: tuple[str, ...]) -> None:
     """Assemble system prompt and run kiro-cli."""
-    _setup_persona()
+    if is_sandbox():
+        _setup_persona()
     _assemble_prompt()
     _set_title()
 
@@ -28,18 +29,16 @@ def kiro(prompt: tuple[str, ...]) -> None:
     if prompt:
         command.append(" ".join(prompt))
 
-    sys.exit(subprocess.run(command).returncode)
+    try:
+        sys.exit(subprocess.run(command).returncode)
+    except FileNotFoundError:
+        click.echo("Error: kiro-cli not found. Is it installed?", err=True)
+        sys.exit(1)
 
 
 def _setup_persona() -> None:
-    """Symlink persona dirs to ~/.kiro/ paths if needed."""
-    # In sandbox, persona is at /opt/archie/persona
-    # On host, persona is relative to the source tree
-    if is_sandbox():
-        persona = Path("/opt/archie/persona")
-    else:
-        persona = Path(__file__).resolve().parents[2] / "persona"
-
+    """Symlink persona dirs to ~/.kiro/ paths (sandbox only)."""
+    persona = Path("/opt/archie/persona")
     if not persona.exists():
         return
 
@@ -54,11 +53,13 @@ def _setup_persona() -> None:
     for src_name, dest_name in links.items():
         src = persona / src_name
         dest = KIRO_HOME / dest_name
-        if src.exists() and not dest.exists():
-            dest.symlink_to(src)
-        elif src.exists() and dest.is_symlink() and dest.resolve() != src.resolve():
-            dest.unlink()
-            dest.symlink_to(src)
+        if not src.exists():
+            continue
+        if dest.is_symlink() or dest.exists():
+            if dest.is_symlink() and dest.resolve() == src.resolve():
+                continue
+            dest.unlink() if dest.is_symlink() else None
+        dest.symlink_to(src)
 
 
 def _assemble_prompt() -> None:

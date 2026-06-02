@@ -217,4 +217,6 @@ RUN case ${TARGETARCH} in \
 ENV PATH="/home/${USERNAME}/.local/bin:${PATH}" \
     LESSCHARSET=utf-8
 
+ENV ARCHIE_SANDBOX=1
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["/bin/bash"]

@@ -395,7 +395,6 @@ def run_container(
     session_name: str | None = None,
     session_dir: Path | None = None,
     background: bool = False,
-    entrypoint: str | None = None,
 ) -> int:
     """Run a command in the sandbox container.
 
@@ -482,9 +481,6 @@ def run_container(
     # Connect to configured networks
     for net in networks:
         args.extend(["--network", net])
-
-    if entrypoint:
-        args.extend(["--entrypoint", entrypoint])
 
     args.extend([IMAGE_NAME, *command])
 
