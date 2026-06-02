@@ -1,6 +1,8 @@
 #!/bin/bash
 # Archie sandbox entrypoint — installs CLI, symlinks persona, assembles system prompt.
 
+export ARCHIE_SANDBOX=1
+
 # Install archie CLI from mounted repo (editable)
 uv tool install -e /opt/archie --quiet
 

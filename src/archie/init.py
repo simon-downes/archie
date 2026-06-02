@@ -36,7 +36,9 @@ def _persona_path() -> Path:
     src = Path(__file__).resolve().parents[2] / "persona"
     if src.exists():
         return src
-    raise FileNotFoundError("Persona directory not found — archie init requires an editable install")
+    raise FileNotFoundError(
+        "Persona directory not found — archie init requires an editable install"
+    )
 
 
 @click.command()

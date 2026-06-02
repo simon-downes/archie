@@ -1,5 +1,6 @@
 """CLI entry point for archie."""
 
+import os
 import shutil
 import sys
 from importlib.resources import as_file, files
@@ -7,7 +8,7 @@ from pathlib import Path
 
 import click
 
-from archie.config import check_status, install, is_installed, load_config
+from archie.config import check_status, install, is_installed, is_sandbox, load_config
 from archie.docker import (
     IMAGE_NAME,
     SESSIONS_DIR,
@@ -192,6 +193,19 @@ def main(
             print_error("Cannot combine --bg and --shell")
             sys.exit(1)
 
+    # Inside sandbox: run kiro-cli directly (no Docker needed)
+    if is_sandbox():
+        prompt_args = (ctx.obj or {}).get("_prompt_args", [])
+        prompt = " ".join(prompt_args) if prompt_args else None
+        if not prompt and not sys.stdin.isatty():
+            prompt = sys.stdin.read().strip() or None
+        command = ["kiro-cli", "chat", "--agent", "archie"]
+        if prompt:
+            command.append(prompt)
+        import subprocess as sp
+
+        sys.exit(sp.run(command).returncode)
+
     if not is_installed():
         print_error(f"Archie is not installed. Run [{C_CMD}]archie install[/] first.")
         sys.exit(1)
@@ -311,6 +325,9 @@ def install_cmd() -> None:
 @main.command(name="ls")
 def ls_cmd() -> None:
     """List sessions and their statuses."""
+    if is_sandbox():
+        print_error("Not available inside the sandbox")
+        sys.exit(1)
     all_sessions = list_sessions()
     if not all_sessions:
         print_info("No sessions")
@@ -336,6 +353,9 @@ def ls_cmd() -> None:
 @click.option("-f", "force", is_flag=True, help="Force removal without prompts")
 def rm_cmd(name: str | None, remove_all: bool, force: bool) -> None:
     """Remove session working directories."""
+    if is_sandbox():
+        print_error("Not available inside the sandbox")
+        sys.exit(1)
     if name:
         _remove_one_session(name, force)
     elif remove_all:
@@ -430,6 +450,61 @@ def _remove_clean_sessions() -> None:
             print_success(f"Removed [bright_blue]{s['project']}/{s['session']}[/bright_blue]")
 
 
+def _sandbox_status(as_json: bool) -> None:
+    """Show reduced status inside the sandbox (no Docker info)."""
+    import json as json_mod
+
+    from archie.auth.inject import CREDENTIAL_ENV_MAP
+    from archie.config import CONFIG_PATH
+    from archie.docker import resolve_brain_dir
+
+    config = load_config()
+    brain_dir = resolve_brain_dir()
+
+    # Check credentials via env vars (injected by host)
+    creds_data = {}
+    for (service, field_name), env_name in CREDENTIAL_ENV_MAP.items():
+        key = f"{service}.{field_name}"
+        configured = bool(os.environ.get(env_name))
+        creds_data[key] = {"env": env_name, "configured": configured}
+
+    if as_json:
+        data = {
+            "sandbox": True,
+            "brain_dir": str(brain_dir),
+            "brain_exists": brain_dir.exists(),
+            "project_dir": config.get("project_dir", "~/dev"),
+            "credentials": creds_data,
+            "config_path": str(CONFIG_PATH),
+        }
+        click.echo(json_mod.dumps(data, indent=2))
+        return
+
+    display_header()
+
+    section("Environment")
+    status_table(
+        (True, "Sandbox", "running"),
+        (brain_dir.exists(), "Brain", str(brain_dir)),
+    )
+
+    if creds_data:
+        section("Credentials")
+        rows = []
+        for key, info in creds_data.items():
+            rows.append(
+                (
+                    info["configured"],
+                    f"{info['env']} ← {key}",
+                    "" if info["configured"] else "not set",
+                )
+            )
+        status_table(*rows)
+
+    section("Config")
+    empty_state(str(CONFIG_PATH))
+
+
 @main.command()
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
 def status(as_json: bool) -> None:
@@ -439,6 +514,11 @@ def status(as_json: bool) -> None:
 
     from archie.auth.inject import CREDENTIAL_ENV_MAP, _load_credentials
     from archie.config import CONFIG_PATH
+
+    # Reduced status view inside sandbox
+    if is_sandbox():
+        _sandbox_status(as_json)
+        return
 
     s = check_status()
     config = load_config()
@@ -563,6 +643,9 @@ def status(as_json: bool) -> None:
 @click.option("--quick", is_flag=True, help="Use Docker cache for faster builds.")
 def build(quick: bool) -> None:
     """Build the sandbox Docker image."""
+    if is_sandbox():
+        print_error("Not available inside the sandbox")
+        sys.exit(1)
     sandbox_pkg = files("archie").joinpath("sandbox", "Dockerfile")
     if sandbox_pkg.is_file():
         print_info(f"Building [{C_KEY}]{IMAGE_NAME}[/] image...")

@@ -1,5 +1,6 @@
 """Configuration loading."""
 
+import os
 import shutil
 import subprocess
 import sys
@@ -117,6 +118,11 @@ class StatusCheck:
 def is_installed() -> bool:
     """Check if archie has been installed."""
     return CONFIG_PATH.exists()
+
+
+def is_sandbox() -> bool:
+    """Check if running inside the archie sandbox container."""
+    return os.environ.get("ARCHIE_SANDBOX") == "1"
 
 
 def install() -> None:
