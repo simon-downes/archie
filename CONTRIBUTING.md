@@ -27,7 +27,6 @@ archie/
 ├── persona/                     # Who Archie is
 │   ├── agents/                  # Agent configs (JSON) — orchestrator + subagents
 │   ├── skills/                  # Layered knowledge modules
-│   ├── prompts/                 # Utility scripts (build-signals.py)
 │   └── guidance/                # Steering files (tools.md, LOCAL.md)
 ├── src/archie/                  # Unified Python CLI
 │   ├── cli.py                   # Click CLI — main group + session commands

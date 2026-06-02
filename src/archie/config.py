@@ -140,7 +140,6 @@ def install() -> None:
     links = {
         "skills": "skills",
         "agents": "agents",
-        "prompts": "prompts",
         "guidance": "steering",
     }
 

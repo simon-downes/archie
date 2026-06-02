@@ -47,7 +47,6 @@ def _setup_persona() -> None:
     links = {
         "skills": "skills",
         "agents": "agents",
-        "prompts": "prompts",
         "guidance": "steering",
     }
     for src_name, dest_name in links.items():
