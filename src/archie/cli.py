@@ -455,8 +455,7 @@ def _sandbox_status(as_json: bool) -> None:
     import json as json_mod
 
     from archie.auth.inject import CREDENTIAL_ENV_MAP
-    from archie.config import CONFIG_PATH
-    from archie.docker import resolve_brain_dir
+    from archie.config import CONFIG_PATH, resolve_brain_dir
 
     config = load_config()
     brain_dir = resolve_brain_dir()
