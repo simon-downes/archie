@@ -286,18 +286,14 @@ def _run_session(
     # Unnamed session
     if project:
         # Unnamed project — mount project dir directly
-        sys.exit(
-            run_container(command, project=project, background=background)
-        )
+        sys.exit(run_container(command, project=project, background=background))
     else:
         # Unnamed general — transient working dir
         suffix = hash_suffix()
         session_dir = SESSIONS_DIR / "general" / suffix
         session_dir.mkdir(parents=True, exist_ok=True)
         try:
-            returncode = run_container(
-                command, session_dir=session_dir, background=background
-            )
+            returncode = run_container(command, session_dir=session_dir, background=background)
         finally:
             # Clean up transient dir
             if session_dir.exists():

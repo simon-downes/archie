@@ -27,7 +27,7 @@ archie/
 ├── persona/                     # Who Archie is
 │   ├── agents/                  # Agent configs (JSON) — orchestrator + subagents
 │   ├── skills/                  # Layered knowledge modules
-│   ├── prompts/                 # Subagent prompts + build-signals.py
+│   ├── prompts/                 # Utility scripts (build-signals.py)
 │   └── guidance/                # Steering files (tools.md, LOCAL.md)
 ├── src/archie/                  # Unified Python CLI
 │   ├── cli.py                   # Click CLI — main group + session commands
@@ -48,7 +48,7 @@ archie/
 │   └── digest/                  # Digest generation
 ├── sandbox/
 │   ├── Dockerfile               # Sandbox image (Debian + dev tools)
-│   └── entrypoint.sh            # Container entrypoint (prompt assembly)
+│   └── entrypoint.sh            # Container entrypoint (setup + passthrough)
 ├── tests/
 ├── docs/
 ├── plugin.json                  # Skill sharing manifest
@@ -139,9 +139,10 @@ The sandbox mounts:
 - Project directory (read-write)
 - User-configured mounts from `~/.archie/config.yaml`
 
-The entrypoint installs archie from the mounted repo (`uv tool install -e /opt/archie`),
-symlinks persona dirs to kiro-cli paths, and assembles the system prompt from brain-resident
-files.
+The entrypoint installs archie from the mounted repo (`uv tool install -e /opt/archie`)
+and passes through to the command. The default command is `archie kiro`, which symlinks
+persona dirs to kiro-cli paths, assembles the system prompt from brain-resident files
+(resolving `@` directives in `_archie/soul.md`), and launches kiro-cli.
 
 ## Adding a Service Integration
 
@@ -156,13 +157,13 @@ files.
 
 ### System Prompt
 
-The system prompt is assembled by the container entrypoint from brain-resident files.
+The system prompt is assembled by `archie kiro` from brain-resident files.
 The live template is `_archie/soul.md` in the brain, which uses `@` directives to include
 other files:
 
 - `@agent <file>` — include from `<brain>/_archie/<file>`
 - `@user <file>` — include from `<brain>/simon/<file>` (strips frontmatter)
-- `@script <alias>` — run command from config, include stdout
+- `@script <alias>` — run command from config or built-in (e.g. `signals`)
 
 The seed lives at `persona/agents/archie.md` and is deployed to the brain on `archie init`.
 

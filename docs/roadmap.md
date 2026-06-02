@@ -7,7 +7,7 @@ The next evolution of Archie, informed by research into PAI v5, OpenClaw, and Ar
 Persona and config improvements that deliver value immediately with no infrastructure
 dependencies.
 
-1. **SOUL.md** — Extract personality/voice from `archie.prompt.md` into an evolvable file.
+1. ~~**SOUL.md** — Extract personality/voice into an evolvable file.~~ Done — `_archie/soul.md` with `@` directives.
    Opinions, tone, writing style, relationship dynamic. Loaded as system prompt.
 
 2. **ME.md** — Structured user profile. Communication preferences, role, priorities,
