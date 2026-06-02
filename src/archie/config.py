@@ -29,10 +29,12 @@ DEFAULT_CONFIG = {
     "theme": "blue",
     "auth": {
         "notion": {
+            "type": "oauth",
             "authorization_endpoint": "https://api.notion.com/v1/oauth/authorize",
             "token_endpoint": "https://api.notion.com/v1/oauth/token",
         },
         "slack": {
+            "type": "oauth",
             "authorization_endpoint": "https://slack.com/oauth/v2/authorize",
             "token_endpoint": "https://slack.com/api/oauth.v2.access",
             "token_path": "authed_user.access_token",
@@ -45,6 +47,7 @@ DEFAULT_CONFIG = {
             },
         },
         "google": {
+            "type": "oauth",
             "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
             "token_endpoint": "https://oauth2.googleapis.com/token",
             "scopes": [
