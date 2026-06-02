@@ -210,10 +210,8 @@ RUN case ${TARGETARCH} in \
     rm -rf kirocli.zip kirocli
 
 # Install toad as user (frequent updates)
-RUN uv tool install batrachian-toad
+# RUN uv tool install batrachian-toad
 
-# Install agent-kit tools as user (frequent updates)
-RUN uv tool install git+https://github.com/simon-downes/agent-kit.git
 
 # Ensure user's tool bin is in PATH
 ENV PATH="/home/${USERNAME}/.local/bin:${PATH}" \
