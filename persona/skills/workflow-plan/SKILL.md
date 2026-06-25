@@ -146,15 +146,19 @@ See [references/DESIGN.md](references/DESIGN.md) for decision categories and exa
 **Goal:** Break work into incremental, testable deliverables with enough technical context
 that an implementor in a fresh session can execute without re-discovering decisions.
 
-Each milestone has four sections:
+Each milestone has four required sections and two conditional sections:
 
 - **Approach** — technical context that shapes how the work is done: which libraries/patterns
   to use, where in the codebase this fits, constraints, and ⚠️ gotchas. The "how and why."
+- **Wiring** *(when milestone introduces shared state or cross-module coordination)* —
+  data flow: what state is created, who mutates it, who reads it, what call sites look like.
+- **Edge Cases** *(when milestone handles external input or has failure modes)* —
+  non-happy-path scenarios with decided behaviour. One line each: scenario → behaviour.
 - **Tasks** — concrete units of work to complete, in roughly the order they should happen.
   The "what gets done."
 - **Deliverable** — single testable outcome. What's true when this milestone is complete.
 - **Verify** — how to confirm the deliverable. A command to run, a test to pass, a behaviour
-  to observe.
+  to observe. Must include HOW to observe, not just WHAT to observe.
 
 **Format:**
 ```
@@ -162,6 +166,13 @@ Each milestone has four sections:
    Approach:
    - [technical context, guidance, constraints]
    - ⚠️ [gotchas or high-stakes items]
+   Wiring: (if shared state / cross-module)
+   - State: [what, type, where instantiated]
+   - Producers: [what mutates it]
+   - Consumers: [what reads it, when]
+   - Call site: [resulting function call]
+   Edge cases: (if external input / failure modes)
+   - [scenario]: [behaviour]
    Tasks:
    - [concrete unit of work]
    - [concrete unit of work]
@@ -173,8 +184,10 @@ Each milestone has four sections:
 - Would the implementor need to choose a library or tool? → resolve in Approach
 - Would the implementor need to decide where new code lives? → resolve in Approach
 - Would the implementor need to establish a new pattern? → resolve in Approach
+- Does this milestone introduce shared state or cross-module data flow? → add Wiring
+- Does this milestone handle external input or have failure modes? → add Edge Cases
 - Are Tasks specific enough to track progress but not so detailed they prescribe code?
-- Does Verify give a concrete way to confirm the deliverable?
+- Does Verify give a concrete way to confirm the deliverable (including how to observe)?
 
 **After completing milestones, automatically proceed to Phase 4.**
 
@@ -248,12 +261,14 @@ Resolve cross-cutting decisions:
 
 ### Milestone Sections
 
-| Section     | Purpose                                    |
-|-------------|--------------------------------------------|
-| Approach    | How and why — context, guidance, constraints |
-| Tasks       | What — concrete units of work              |
-| Deliverable | Done when — single testable outcome        |
-| Verify      | Proof — how to confirm                     |
+| Section     | Purpose                                                  | When             |
+|-------------|----------------------------------------------------------|------------------|
+| Approach    | How and why — context, guidance, constraints             | Always           |
+| Wiring      | Data flow — state ownership, producers, consumers, call sites | Shared state / cross-module |
+| Edge Cases  | Decided behaviour for non-happy-path scenarios           | External input / failure modes |
+| Tasks       | What — concrete units of work                            | Always           |
+| Deliverable | Done when — single testable outcome                      | Always           |
+| Verify      | Proof — how to confirm (including observation mechanism) | Always           |
 
 ### Milestone Rules
 

@@ -7,7 +7,7 @@ implementor in a fresh session can execute without re-discovering decisions.
 
 ## Milestone Structure
 
-Each milestone has four sections:
+Each milestone has four required sections and two conditional sections:
 
 **Approach** — technical context that shapes how the work is done:
 - Which libraries, tools, or patterns to use
@@ -16,6 +16,31 @@ Each milestone has four sections:
 - ⚠️ Gotchas that could cause problems if missed
 
 Approach answers: "given these tasks, here's what you need to know to do them right."
+
+**Wiring** *(required when the milestone introduces shared state or cross-module coordination)* —
+how data flows between components after the change:
+- State: what is created, its type, where it's instantiated
+- Producers: what writes/mutates it, via what mechanism
+- Consumers: what reads it, when, via what mechanism
+- Call site: what the constructor/function call looks like after this milestone
+
+Wiring answers: "who owns what and how does it reach where it's needed?"
+
+Include Wiring when: a milestone creates shared mutable state, passes data between modules,
+changes function signatures that affect multiple call sites, or introduces callbacks/closures
+that capture state. Skip when: the milestone is self-contained within one module.
+
+**Edge Cases** *(required when the milestone handles external input, user-facing errors, or
+shared mutable state)* — non-happy-path scenarios with decided behaviour:
+- One line per case: scenario → behaviour
+- These are design decisions, not implementation details
+- The planner decides the behaviour; the implementor decides the code
+
+Edge Cases answers: "what happens when things go wrong or inputs are unexpected?"
+
+Include Edge Cases when: a milestone accepts user/model input, reads files that may not exist,
+mutates shared state that others read, or interacts with external systems. Skip when: the
+milestone is purely internal plumbing with no failure modes.
 
 **Tasks** — concrete units of work to complete:
 - Specific enough to track progress against
@@ -33,6 +58,7 @@ Tasks answer: "here's what actually needs to get built."
 **Verify** — how to confirm the deliverable:
 - A command to run, a test to pass, a behaviour to observe
 - Specific enough that the implementor knows exactly how to check
+- Must include HOW to observe the outcome, not just WHAT to observe
 
 ## Format
 
@@ -42,11 +68,19 @@ Tasks answer: "here's what actually needs to get built."
    - [technical context, guidance, pattern to follow]
    - [library/tool choice and why]
    - ⚠️ [gotcha or high-stakes item]
+   Wiring:
+   - State: [what, type, where instantiated]
+   - Producers: [what mutates it, mechanism]
+   - Consumers: [what reads it, when]
+   - Call site: [function_call(new_param=value)]
+   Edge cases:
+   - [scenario]: [decided behaviour]
+   - [scenario]: [decided behaviour]
    Tasks:
    - [concrete unit of work]
    - [concrete unit of work]
    Deliverable: [single testable outcome]
-   Verify: [how to confirm]
+   Verify: [how to confirm — including observation mechanism]
 ```
 
 ## Rules
@@ -81,9 +115,11 @@ Before presenting milestones, audit each one:
 - [ ] Would the implementor need to choose a library or tool? → resolve in Approach
 - [ ] Would the implementor need to decide where new code lives? → resolve in Approach
 - [ ] Would the implementor need to establish a new pattern? → resolve in Approach
+- [ ] Does this milestone introduce shared state or cross-module data flow? → add Wiring
+- [ ] Does this milestone handle external input or have failure modes? → add Edge Cases
 - [ ] Are Tasks specific enough to track progress?
 - [ ] Is the Deliverable a single testable outcome?
-- [ ] Does Verify give a concrete way to confirm?
+- [ ] Does Verify give a concrete way to confirm (including observation mechanism)?
 
 ## Good Examples
 
@@ -128,7 +164,38 @@ Before presenting milestones, audit each one:
    Verify: Run test suite; check headers on both allowed and rejected requests
 ```
 
-### Example 2: Database Migration
+### Example 2: Shared State with Wiring and Edge Cases
+
+```
+1. Add skill loading tool with shared state
+   Approach:
+   - New file src/tools/skill.py following closure pattern (make_skill_spec)
+   - Skill body = everything after second --- in SKILL.md (frontmatter stripped)
+   - Reference file validation: resolve relative to SkillEntry.path.parent, reject if
+     resolved path is not under that directory (same logic as validate_path)
+   Wiring:
+   - State: loaded_skills: list[tuple[str, str]], instantiated as [] in app.py._build_stack()
+   - Producers: skill tool handler appends (name, body) during tool execution
+   - Consumers: prompt-building closure reads it on each _do_request() call
+   - Call site: create_default_registry(..., catalog=catalog, loaded_skills=loaded_skills)
+   Edge cases:
+   - Skill not in catalog: return tool_error("Unknown skill 'x'. Available: ...")
+   - Duplicate load (same skill loaded twice): no-op, return "already loaded" message
+   - SKILL.md has no body after frontmatter: load succeeds with empty body
+   - Malformed frontmatter (missing name/description): skip during discovery, log warning
+   - Reference file path traversal (../): return tool_error("Path outside skill directory")
+   - Reference file not found: return tool_error("File not found: ...")
+   Tasks:
+   - Add src/tools/skill.py with make_skill_spec(catalog, loaded_skills)
+   - Implement load mode: parse body, append to loaded_skills, list files in skill dir
+   - Implement read mode: resolve path, validate containment, return raw content
+   - Register in create_default_registry() when catalog is non-empty
+   - Add tests covering each edge case above
+   Deliverable: Skill tool loads skills into shared state and reads references safely
+   Verify: uv run pytest tests/test_tool_skill.py — all edge cases pass
+```
+
+### Example 3: Database Migration
 
 ```
 1. Create migration infrastructure
